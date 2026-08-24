@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import tempfile
 from pathlib import Path
 
@@ -161,10 +162,34 @@ def _simulate_blurred_whatsapp_screenshot(source_path: str | Path, output_path: 
     return destination
 
 
+def self_check_mode() -> str:
+    """How thoroughly signing should re-verify its own output.
+
+    "full" replays every sharing channel — a forwarded JPEG, a WhatsApp-sized
+    download, and two screenshot renderings — and is the right default when
+    there is CPU to spare.
+
+    "fast" checks only that the signed file verifies directly. The four
+    replays dominate signing cost because each one drives registry recovery,
+    and on a small shared-CPU host they push a signing request past the
+    gateway timeout. Direct verification still catches the failure that
+    actually matters: emitting a file that cannot be verified at all.
+
+    "off" skips verification entirely. Only sensible when signing throughput
+    matters more than the guarantee.
+    """
+    mode = os.getenv("SIGN_SELF_CHECK", "full").strip().lower()
+    return mode if mode in {"full", "fast", "off"} else "full"
+
+
 def _self_check_signed_output(
     output_path: str | Path,
     public_key_path: str | Path | None = None,
 ) -> None:
+    mode = self_check_mode()
+    if mode == "off":
+        return
+
     try:
         from .verify_poster import verify_poster
     except ImportError:
@@ -173,6 +198,9 @@ def _self_check_signed_output(
     direct_ok, _ = verify_poster(output_path, public_key_path=public_key_path, audit=False)
     if not direct_ok:
         raise RuntimeError("Direct verification of the signed poster failed.")
+
+    if mode == "fast":
+        return
 
     with tempfile.TemporaryDirectory(prefix="dts_share_check_") as temp_dir:
         forwarded_path = Path(temp_dir) / "forwarded_preview.jpg"

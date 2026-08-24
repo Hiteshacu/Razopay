@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
@@ -430,15 +431,33 @@ def _iter_restored_candidates(
     return restored_candidates
 
 
+def _recovery_budget_multiplier() -> float:
+    """Stretch the recovery time budget on slower hosts.
+
+    The budgets below are wall-clock and were tuned on a developer machine.
+    On a small shared-CPU instance the same work runs an order of magnitude
+    slower, so an unscaled budget expires before a single candidate has been
+    tested and recovery reports "not found" for an image it would otherwise
+    have recovered. Raise this where CPU is scarce.
+    """
+    try:
+        multiplier = float(os.getenv("DTS_RECOVERY_BUDGET_MULTIPLIER", "1"))
+    except ValueError:
+        return 1.0
+    return multiplier if multiplier > 0 else 1.0
+
+
 def _screenshot_recovery_budget_seconds(image: np.ndarray) -> float:
     megapixels = (image.shape[0] * image.shape[1]) / 1_000_000.0
     if megapixels <= 1.5:
-        return 2.0
-    if megapixels <= 3.0:
-        return 3.5
-    if megapixels <= 5.0:
-        return 5.0
-    return 6.5
+        base = 2.0
+    elif megapixels <= 3.0:
+        base = 3.5
+    elif megapixels <= 5.0:
+        base = 5.0
+    else:
+        base = 6.5
+    return base * _recovery_budget_multiplier()
 
 
 def _verify_screenshot_recovery(

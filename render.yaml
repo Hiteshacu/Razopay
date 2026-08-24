@@ -64,6 +64,17 @@ services:
       - key: KEY_STORE_BACKEND
         value: firestore
 
+      # Free instances get roughly a tenth of a CPU. Measured there with the
+      # full self-check, signing took 220s and the request died at the
+      # gateway; checking only that the signed file verifies directly brings
+      # it to ~34s. Set this back to "full" on a host with real CPU.
+      - key: SIGN_SELF_CHECK
+        value: fast
+      # Recovery budgets are wall-clock and were tuned on a fast machine.
+      # Unscaled, they expire here before a single candidate is tested.
+      - key: DTS_RECOVERY_BUDGET_MULTIPLIER
+        value: "8"
+
   # ---------------------------------------------------------------
   # Admin portal (free static hosting) + the judges' APK download page
   # ---------------------------------------------------------------
