@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Get the Digital Trust Shield app</title>
+<meta name="description" content="Install the Digital Trust Shield verifier app and check whether a poster, notice or payment receipt is genuine." />
+<style>
+  :root {
+    --bg: #f3f6f6;
+    --surface: #ffffff;
+    --ink: #12191c;
+    --ink-soft: #3f4f53;
+    --muted: #66787c;
+    --rule: #dbe4e4;
+    --accent: #0d6e78;
+    --accent-ink: #ffffff;
+    --warn-bg: #fbf1da;
+    --warn-ink: #7a5a10;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0c1214;
+      --surface: #151e21;
+      --ink: #e8eeee;
+      --ink-soft: #bccbcc;
+      --muted: #8ba0a3;
+      --rule: #2a383b;
+      --accent: #35b3bd;
+      --accent-ink: #06181b;
+      --warn-bg: #322a15;
+      --warn-ink: #dcb457;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+    display: flex;
+    justify-content: center;
+    padding: clamp(1rem, 5vw, 3rem) 1rem 4rem;
+  }
+  .card {
+    width: 100%;
+    max-width: 470px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+    padding: clamp(1.4rem, 5vw, 2.2rem);
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  header { display: flex; flex-direction: column; gap: 0.5rem; }
+  .eyebrow {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--accent); margin: 0;
+  }
+  h1 { margin: 0; font-size: clamp(1.5rem, 5vw, 1.9rem); line-height: 1.15; letter-spacing: -0.01em; }
+  .sub { margin: 0; color: var(--ink-soft); font-size: 0.97rem; }
+
+  .download {
+    display: block; text-align: center; text-decoration: none;
+    background: var(--accent); color: var(--accent-ink);
+    font-size: 1.08rem; font-weight: 700;
+    padding: 1.05rem 1.2rem; border-radius: 11px;
+  }
+  .download:active { transform: translateY(1px); }
+  .download small { display: block; font-weight: 500; font-size: 0.78rem; opacity: 0.85; margin-top: 0.2rem; }
+
+  .steps { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.55rem; }
+  .steps li { color: var(--ink-soft); font-size: 0.94rem; }
+  .steps b { color: var(--ink); }
+
+  .notice {
+    background: var(--warn-bg); color: var(--warn-ink);
+    border-radius: 10px; padding: 0.85rem 1rem; font-size: 0.88rem;
+  }
+  .notice b { display: block; margin-bottom: 0.15rem; }
+
+  .qr-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 0.7rem;
+    padding-top: 1.3rem; border-top: 1px solid var(--rule);
+  }
+  .qr { width: 168px; height: 168px; color: var(--ink); }
+  .qr svg { width: 100%; height: 100%; display: block; }
+  .qr-cap { font-size: 0.82rem; color: var(--muted); text-align: center; margin: 0; }
+
+  .foot { font-size: 0.82rem; color: var(--muted); text-align: center; margin: 0; }
+  .foot a { color: var(--accent); }
+  @media (max-width: 420px) { .qr { width: 140px; height: 140px; } }
+</style>
+</head>
+<body>
+  <main class="card">
+    <header>
+      <p class="eyebrow">Digital Trust Shield</p>
+      <h1>Check if a poster is real</h1>
+      <p class="sub">Install the verifier app, pick any notice, receipt or poster you were sent, and find out in seconds whether it is genuine or has been edited.</p>
+    </header>
+
+    <a class="download" href="./trust-shield.apk" download>
+      Download the app
+      <small>Android · about 15 MB</small>
+    </a>
+
+    <ol class="steps">
+      <li>Tap <b>Download the app</b> above.</li>
+      <li>Open the downloaded file. Android will ask permission to install from this browser — tap <b>Settings</b>, turn it on, then go back.</li>
+      <li>Tap <b>Install</b>, then open <b>Digital Trust Shield</b>.</li>
+      <li>Choose an image, pick the issuing authority, and tap <b>Verify</b>.</li>
+    </ol>
+
+    <p class="notice">
+      <b>Why Android shows a warning</b>
+      This app is distributed directly rather than through the Play Store, so Android asks you to confirm. That prompt is normal for a demo build.
+    </p>
+
+    <div class="qr-wrap">
+      <div class="qr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 37 37" shape-rendering="crispEdges" role="img" aria-label="QR code linking to the Digital Trust Shield app download page"><path fill="currentColor" d="M2 2h7v1h-7zM10 2h2v1h-2zM14 2h2v1h-2zM19 2h2v1h-2zM23 2h2v1h-2zM26 2h1v1h-1zM28 2h7v1h-7zM2 3h1v1h-1zM8 3h1v1h-1zM10 3h1v1h-1zM13 3h4v1h-4zM20 3h2v1h-2zM26 3h1v1h-1zM28 3h1v1h-1zM34 3h1v1h-1zM2 4h1v1h-1zM4 4h3v1h-3zM8 4h1v1h-1zM10 4h2v1h-2zM15 4h2v1h-2zM21 4h3v1h-3zM28 4h1v1h-1zM30 4h3v1h-3zM34 4h1v1h-1zM2 5h1v1h-1zM4 5h3v1h-3zM8 5h1v1h-1zM11 5h2v1h-2zM16 5h3v1h-3zM20 5h3v1h-3zM24 5h1v1h-1zM26 5h1v1h-1zM28 5h1v1h-1zM30 5h3v1h-3zM34 5h1v1h-1zM2 6h1v1h-1zM4 6h3v1h-3zM8 6h1v1h-1zM10 6h2v1h-2zM13 6h1v1h-1zM17 6h3v1h-3zM24 6h2v1h-2zM28 6h1v1h-1zM30 6h3v1h-3zM34 6h1v1h-1zM2 7h1v1h-1zM8 7h1v1h-1zM11 7h1v1h-1zM14 7h2v1h-2zM17 7h5v1h-5zM26 7h1v1h-1zM28 7h1v1h-1zM34 7h1v1h-1zM2 8h7v1h-7zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM18 8h1v1h-1zM20 8h1v1h-1zM22 8h1v1h-1zM24 8h1v1h-1zM26 8h1v1h-1zM28 8h7v1h-7zM13 9h6v1h-6zM24 9h2v1h-2zM2 10h1v1h-1zM5 10h7v1h-7zM14 10h1v1h-1zM16 10h1v1h-1zM18 10h2v1h-2zM25 10h1v1h-1zM27 10h1v1h-1zM30 10h1v1h-1zM32 10h3v1h-3zM3 11h2v1h-2zM6 11h2v1h-2zM15 11h3v1h-3zM19 11h5v1h-5zM25 11h1v1h-1zM30 11h3v1h-3zM4 12h2v1h-2zM8 12h2v1h-2zM11 12h1v1h-1zM14 12h2v1h-2zM17 12h2v1h-2zM22 12h1v1h-1zM24 12h2v1h-2zM27 12h1v1h-1zM30 12h5v1h-5zM6 13h2v1h-2zM9 13h1v1h-1zM12 13h2v1h-2zM15 13h1v1h-1zM17 13h1v1h-1zM20 13h1v1h-1zM22 13h3v1h-3zM26 13h2v1h-2zM29 13h1v1h-1zM32 13h1v1h-1zM3 14h2v1h-2zM7 14h5v1h-5zM13 14h3v1h-3zM19 14h1v1h-1zM21 14h1v1h-1zM23 14h1v1h-1zM25 14h5v1h-5zM34 14h1v1h-1zM3 15h1v1h-1zM6 15h2v1h-2zM9 15h1v1h-1zM13 15h2v1h-2zM16 15h1v1h-1zM20 15h3v1h-3zM26 15h2v1h-2zM29 15h1v1h-1zM31 15h2v1h-2zM4 16h2v1h-2zM8 16h2v1h-2zM17 16h1v1h-1zM21 16h2v1h-2zM24 16h1v1h-1zM28 16h1v1h-1zM31 16h2v1h-2zM3 17h1v1h-1zM6 17h2v1h-2zM11 17h6v1h-6zM18 17h1v1h-1zM20 17h1v1h-1zM22 17h1v1h-1zM25 17h3v1h-3zM29 17h1v1h-1zM31 17h2v1h-2zM34 17h1v1h-1zM6 18h8v1h-8zM15 18h3v1h-3zM22 18h1v1h-1zM24 18h1v1h-1zM27 18h4v1h-4zM2 19h5v1h-5zM9 19h3v1h-3zM14 19h1v1h-1zM16 19h2v1h-2zM19 19h4v1h-4zM24 19h1v1h-1zM27 19h2v1h-2zM30 19h1v1h-1zM32 19h1v1h-1zM34 19h1v1h-1zM4 20h1v1h-1zM8 20h1v1h-1zM10 20h2v1h-2zM13 20h1v1h-1zM17 20h9v1h-9zM29 20h1v1h-1zM31 20h2v1h-2zM34 20h1v1h-1zM2 21h3v1h-3zM7 21h1v1h-1zM9 21h2v1h-2zM12 21h1v1h-1zM14 21h1v1h-1zM16 21h3v1h-3zM21 21h1v1h-1zM24 21h1v1h-1zM30 21h4v1h-4zM4 22h2v1h-2zM7 22h5v1h-5zM13 22h1v1h-1zM16 22h1v1h-1zM18 22h1v1h-1zM20 22h1v1h-1zM23 22h2v1h-2zM26 22h1v1h-1zM29 22h1v1h-1zM31 22h1v1h-1zM34 22h1v1h-1zM2 23h1v1h-1zM5 23h1v1h-1zM9 23h3v1h-3zM13 23h1v1h-1zM15 23h2v1h-2zM19 23h1v1h-1zM23 23h1v1h-1zM25 23h1v1h-1zM29 23h2v1h-2zM32 23h1v1h-1zM2 24h1v1h-1zM4 24h3v1h-3zM8 24h1v1h-1zM11 24h5v1h-5zM19 24h1v1h-1zM21 24h3v1h-3zM25 24h4v1h-4zM30 24h2v1h-2zM33 24h2v1h-2zM2 25h1v1h-1zM6 25h1v1h-1zM15 25h3v1h-3zM19 25h1v1h-1zM21 25h2v1h-2zM24 25h3v1h-3zM30 25h5v1h-5zM2 26h2v1h-2zM8 26h2v1h-2zM11 26h1v1h-1zM16 26h1v1h-1zM18 26h1v1h-1zM22 26h1v1h-1zM25 26h7v1h-7zM33 26h1v1h-1zM10 27h1v1h-1zM12 27h2v1h-2zM17 27h1v1h-1zM19 27h2v1h-2zM23 27h1v1h-1zM25 27h2v1h-2zM30 27h1v1h-1zM32 27h2v1h-2zM2 28h7v1h-7zM10 28h2v1h-2zM14 28h2v1h-2zM17 28h3v1h-3zM21 28h2v1h-2zM25 28h2v1h-2zM28 28h1v1h-1zM30 28h1v1h-1zM32 28h1v1h-1zM2 29h1v1h-1zM8 29h1v1h-1zM10 29h2v1h-2zM17 29h1v1h-1zM19 29h2v1h-2zM23 29h4v1h-4zM30 29h5v1h-5zM2 30h1v1h-1zM4 30h3v1h-3zM8 30h1v1h-1zM10 30h4v1h-4zM15 30h2v1h-2zM18 30h2v1h-2zM23 30h8v1h-8zM33 30h2v1h-2zM2 31h1v1h-1zM4 31h3v1h-3zM8 31h1v1h-1zM10 31h1v1h-1zM13 31h2v1h-2zM16 31h1v1h-1zM18 31h1v1h-1zM20 31h1v1h-1zM23 31h3v1h-3zM27 31h1v1h-1zM29 31h1v1h-1zM34 31h1v1h-1zM2 32h1v1h-1zM4 32h3v1h-3zM8 32h1v1h-1zM12 32h1v1h-1zM14 32h4v1h-4zM19 32h3v1h-3zM23 32h4v1h-4zM29 32h3v1h-3zM33 32h2v1h-2zM2 33h1v1h-1zM8 33h1v1h-1zM11 33h1v1h-1zM13 33h2v1h-2zM21 33h2v1h-2zM24 33h2v1h-2zM27 33h8v1h-8zM2 34h7v1h-7zM10 34h1v1h-1zM13 34h1v1h-1zM16 34h4v1h-4zM21 34h1v1h-1zM25 34h2v1h-2zM29 34h2v1h-2z"/></svg></div>
+      <p class="qr-cap">Scan to open this page on a phone</p>
+    </div>
+
+    <p class="foot">Verification runs against <a href="https://trust-shield-api.onrender.com/api/health">the Trust Shield service</a>. Nothing you upload is kept.</p>
+  </main>
+</body>
+</html>

@@ -24,7 +24,11 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-        buildConfigField("String", "API_BASE_URL", "\"http://10.28.83.90:8000/\"")
+        // Public HTTPS backend, so the app works on mobile data and on any
+        // network — not only a laptop sharing the phone's Wi-Fi.
+        // For local backend work, swap in http://10.0.2.2:8000/ (emulator) or
+        // your machine's LAN IP, and re-enable cleartext in AndroidManifest.
+        buildConfigField("String", "API_BASE_URL", "\"https://trust-shield-api.onrender.com/\"")
     }
 
     compileOptions {

@@ -89,6 +89,12 @@ services:
       - key: VITE_API_BASE_URL
         value: https://trust-shield-api.onrender.com
     routes:
+      # The APK landing page is plain HTML sitting in public/apk/. This rule
+      # must come first: the SPA catch-all below would otherwise answer /apk
+      # with the React app.
+      - type: rewrite
+        source: /apk
+        destination: /apk/index.html
       - type: rewrite
         source: /*
         destination: /index.html
