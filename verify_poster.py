@@ -431,6 +431,38 @@ def _iter_restored_candidates(
     return restored_candidates
 
 
+class VerificationDeadline(Exception):
+    """Raised when verification runs out of time before finding proof.
+
+    Surfaced to callers as a missing watermark, because that is what the
+    evidence supports: nothing was recovered within the time allowed.
+    """
+
+
+def _verification_deadline() -> float | None:
+    """Absolute time by which verification must give up, or None for no limit.
+
+    An image carrying a valid watermark is answered by the first, cheapest
+    check. An image carrying none is the expensive case: every recovery tier
+    runs to exhaustion before the verdict is known, and on a small instance
+    that can exceed any sane HTTP timeout — the caller sees a gateway error
+    instead of "not authentic". Bounding the total keeps the negative answer
+    arriving as an answer.
+    """
+    try:
+        budget = float(os.getenv("DTS_VERIFY_DEADLINE_SECONDS", "0"))
+    except ValueError:
+        return None
+    return time.perf_counter() + budget if budget > 0 else None
+
+
+def _check_deadline(deadline: float | None) -> None:
+    if deadline is not None and time.perf_counter() >= deadline:
+        raise VerificationDeadline(
+            "Watermark marker not found before the verification time budget ended."
+        )
+
+
 def _recovery_budget_multiplier() -> float:
     """Stretch the recovery time budget on slower hosts.
 
@@ -464,10 +496,14 @@ def _verify_screenshot_recovery(
     image: np.ndarray,
     public_key_path: str | Path | None = None,
     candidates: list[tuple[str, np.ndarray]] | None = None,
+    deadline: float | None = None,
 ) -> tuple[bool, str, str]:
     last_error: Exception | None = None
     found_registry_match = False
-    deadline = time.perf_counter() + _screenshot_recovery_budget_seconds(image)
+    stage_deadline = time.perf_counter() + _screenshot_recovery_budget_seconds(image)
+    # Never run past the overall verification budget, however much of this
+    # stage's own allowance is left.
+    deadline = stage_deadline if deadline is None else min(deadline, stage_deadline)
     failed_visual_match_count = 0
     timed_out_without_proof = False
 
@@ -678,6 +714,7 @@ def _verify_registry_visual_match(
 def _verify_full_frame_registry_recovery(
     image: np.ndarray,
     public_key_path: str | Path | None = None,
+    deadline: float | None = None,
 ) -> tuple[bool, str, str]:
     """
     Recover a forwarded full-frame image by resizing it back to a known signed geometry.
@@ -707,6 +744,7 @@ def _verify_full_frame_registry_recovery(
     attempted_match_count = 0
 
     for match in registry_matches:
+        _check_deadline(deadline)
         dimensions = match["dimensions"]
         if dimensions is None:
             continue
@@ -745,6 +783,11 @@ def _verify_full_frame_registry_recovery(
             )
 
         for restored_label, restored in restored_candidates:
+            # Each attempt re-derives a full perceptual fingerprint, which is
+            # the single most expensive operation in verification. Check the
+            # clock every time so the overshoot stays at one attempt rather
+            # than the whole shortlist.
+            _check_deadline(deadline)
             try:
                 is_valid, signature_b64, agreement = _verify_registry_watermark_correlation(
                     restored,
@@ -752,6 +795,8 @@ def _verify_full_frame_registry_recovery(
                     public_key_path=public_key_path,
                 )
                 return True, signature_b64, f"forwarded_full_frame_correlation:{restored_label}:{agreement:.3f}"
+            except VerificationDeadline:
+                raise
             except Exception as correlation_exc:
                 last_error = correlation_exc
 
@@ -767,6 +812,7 @@ def _verify_image_with_mode(
     public_key_path: str | Path | None = None,
     allow_registry_fallback: bool = False,
 ) -> tuple[bool, str, str]:
+    deadline = _verification_deadline()
     screenshot_candidates = _iter_screenshot_candidates(image)
 
     watermark_error: Exception | None = None
@@ -788,27 +834,39 @@ def _verify_image_with_mode(
         if "selected public key did not validate" in str(exc).lower():
             raise watermark_error
 
+    _check_deadline(deadline)
     try:
         return _verify_full_frame_registry_recovery(
             image,
             public_key_path=public_key_path,
+            deadline=deadline,
         )
+    except VerificationDeadline:
+        raise
     except Exception as forwarded_recovery_error:
         if watermark_error is None:
             watermark_error = forwarded_recovery_error
 
+    _check_deadline(deadline)
     try:
         return _verify_screenshot_recovery(
             image,
             public_key_path=public_key_path,
             candidates=screenshot_candidates,
+            deadline=deadline,
         )
+    except VerificationDeadline:
+        raise
     except Exception as screenshot_error:
         if allow_registry_fallback:
             raise ValueError(
                 "Registry fallback is disabled for poster authenticity verification. "
                 "Only an embedded watermark can prove a poster is authentic."
             ) from screenshot_error
+        # The legacy sweep re-reads the image at a dozen scales under two
+        # permutations. It is the most expensive tier and only helps images
+        # signed by an older release, so it is skipped once time is short.
+        _check_deadline(deadline)
         try:
             is_valid, signature_b64 = _verify_embedded_watermark(
                 image,

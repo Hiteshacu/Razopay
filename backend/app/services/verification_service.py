@@ -88,12 +88,32 @@ class VerificationService:
         finally:
             public_key_path.unlink(missing_ok=True)
 
+    # Trying every key against an image that carries no proof at all multiplies
+    # the slowest path by the number of registered keys. Cap it even when a
+    # retry is warranted.
+    MAX_KEY_RETRIES = 3
+
     def _active_public_keys_for_retry(self, selected_key_id: str) -> list[dict]:
         return [
             key
             for key in self.firebase.list_public_keys()
             if key.get("active", True) and key.get("key_id") != selected_key_id
-        ]
+        ][: self.MAX_KEY_RETRIES]
+
+    @staticmethod
+    def _is_worth_retrying_with_other_keys(result: str) -> bool:
+        """Only a key mismatch is worth re-testing against other keys.
+
+        SIGNATURE_INVALID means a watermark was recovered but the selected key
+        did not validate it — exactly the case where the document belongs to a
+        different authority, so another key may succeed.
+
+        WATERMARK_NOT_FOUND means no proof was recovered at all, and TAMPERED
+        means one was recovered and validated but the visible content has since
+        changed. Neither verdict can be altered by trying a different key, so
+        retrying only repeats the most expensive path once per registered key.
+        """
+        return result == "SIGNATURE_INVALID"
 
     async def verify_upload(self, file: UploadFile, key_id: str) -> dict:
         key = self.firebase.get_document("public_keys", key_id)
@@ -111,7 +131,7 @@ class VerificationService:
         try:
             response = self._verify_with_public_key(upload_path, key_id, key)
 
-            if not response["success"]:
+            if not response["success"] and self._is_worth_retrying_with_other_keys(response["result"]):
                 for candidate_key in self._active_public_keys_for_retry(key_id):
                     candidate_key_id = str(candidate_key.get("key_id"))
                     candidate_response = self._verify_with_public_key(
