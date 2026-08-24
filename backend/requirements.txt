@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
+firebase-admin
+cryptography
+opencv-python
+numpy
+Pillow
+PyMuPDF
+pydantic[email]
+httpx

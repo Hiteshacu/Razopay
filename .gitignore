@@ -1,0 +1,94 @@
+# Digital Trust Shield — private deployment repository
+#
+# This repo holds everything Render needs to build and run the service.
+# The source code IS tracked here. What stays out: secrets, key material,
+# personal media, generated runtime state, and large demo videos.
+
+# ---------------------------------------------------------------
+# Secrets and key material — never commit these
+# ---------------------------------------------------------------
+*.pem
+*.key
+*.enc
+.env
+*.env
+!.env.example
+!backend/.env.example
+backend/secrets/
+backend/secure_private_keys/
+.private_key_backups/
+
+# ---------------------------------------------------------------
+# Runtime state — regenerated on the host, must not be versioned
+# ---------------------------------------------------------------
+official_registry.json
+audit_logs/
+backend/uploads/
+backend/temp_uploads/
+backend/temp_outputs/
+demo_runtime/
+*.log
+
+# ---------------------------------------------------------------
+# Personal and demo media — payment screenshots, posters, videos
+# ---------------------------------------------------------------
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.m4v
+*.jpg
+*.jpeg
+*.png
+*.pdf
+*.PDF
+!docs/**/*.png
+!docs/**/*.jpg
+!admin-portal/public/**
+!android-verifier/app/src/main/res/**
+
+# ---------------------------------------------------------------
+# QA and scratch output
+# ---------------------------------------------------------------
+qa_final_check/
+qa_matrix/
+qa_matrix_after_patch/
+qa_pdf/
+qa_quality/
+qa_real_images/
+qa_screenshot/
+qa_screenshot_registry/
+qa_tune/
+qa_tune_rep/
+graphify-out/
+public_github_release/
+.safe_publish_*/
+.remote_probe/
+.git_old/
+
+# ---------------------------------------------------------------
+# Dependencies and build output
+# ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+node_modules/
+admin-portal/dist/
+android-verifier/build/
+android-verifier/app/build/
+android-verifier/.gradle/
+android-verifier/local.properties
+dist/
+build/
+
+# ---------------------------------------------------------------
+# Editor and OS
+# ---------------------------------------------------------------
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

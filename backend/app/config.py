@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = BACKEND_ROOT.parent
+
+
+def _load_dotenv(path: Path) -> None:
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ[key.strip()] = value.strip().strip('"').strip("'")
+
+
+_load_dotenv(BACKEND_ROOT / ".env")
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+@dataclass(frozen=True)
+class Settings:
+    firebase_credentials: str = os.getenv("FIREBASE_CREDENTIALS", "secrets/serviceAccountKey.json")
+    use_local_storage: bool = _env_bool("USE_LOCAL_STORAGE", True)
+    local_upload_dir: str = os.getenv("LOCAL_UPLOAD_DIR", "uploads")
+    secure_keys_dir: str = os.getenv("SECURE_KEYS_DIR", "secure_private_keys")
+    firebase_storage_bucket: str = os.getenv("FIREBASE_STORAGE_BUCKET", "")
+    master_key: str = os.getenv("MASTER_KEY", "")
+    admin_username: str = os.getenv("ADMIN_USERNAME", "admin")
+    admin_password: str = os.getenv("ADMIN_PASSWORD", "admin123")
+    cors_origins: tuple[str, ...] = tuple(
+        origin.strip()
+        for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+        if origin.strip()
+    )
+    storage_make_public: bool = os.getenv("STORAGE_MAKE_PUBLIC", "true").lower() == "true"
+    storage_signed_url_minutes: int = int(os.getenv("STORAGE_SIGNED_URL_MINUTES", "1440"))
+    tavily_api_key: str = os.getenv("TAVILY_API_KEY", "")
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+    groq_model: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+    @property
+    def credentials_path(self) -> Path:
+        candidate = Path(self.firebase_credentials)
+        return candidate if candidate.is_absolute() else BACKEND_ROOT / candidate
+
+    @property
+    def local_upload_root(self) -> Path:
+        candidate = Path(self.local_upload_dir)
+        return candidate if candidate.is_absolute() else BACKEND_ROOT / candidate
+
+    @property
+    def secure_keys_root(self) -> Path:
+        candidate = Path(self.secure_keys_dir)
+        return candidate if candidate.is_absolute() else BACKEND_ROOT / candidate
+
+    @property
+    def original_documents_dir(self) -> Path:
+        return self.local_upload_root / "original_documents"
+
+    @property
+    def signed_documents_dir(self) -> Path:
+        return self.local_upload_root / "signed_documents"
+
+    @property
+    def temp_dir(self) -> Path:
+        return self.local_upload_root / "temp"
+
+    @property
+    def storage_mode(self) -> str:
+        return "local" if self.use_local_storage else "firebase_storage"
+
+
+settings = Settings()
+
+
+def ensure_local_storage_dirs() -> None:
+    directories = (
+        settings.local_upload_root,
+        settings.signed_documents_dir,
+        settings.original_documents_dir,
+        settings.temp_dir,
+    )
+    for directory in directories:
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise RuntimeError(f"Could not create local storage directory '{directory}': {exc}") from exc

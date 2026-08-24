@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digital Trust Shield Demo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="demo-page">
+  <div class="page-glow page-glow-left" aria-hidden="true"></div>
+  <div class="page-glow page-glow-right" aria-hidden="true"></div>
+
+  <header class="section reveal demo-hero">
+    <nav class="topbar" aria-label="Demo navigation">
+      <div class="brand-lockup">
+        <span class="brand-mark">DTS</span>
+        <div>
+          <p class="brand-name">Digital Trust Shield Demo</p>
+          <p class="brand-tag">Sign and verify payment screenshots and videos</p>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <a class="button button-secondary topbar-demo" href="index.html">Back Home</a>
+      </div>
+    </nav>
+
+    <div class="demo-hero-copy">
+      <p class="eyebrow">Live Demo Workflow</p>
+      <h1>Generate RSA keys, sign a payment screenshot or video, then verify whether it is authentic.</h1>
+      <p class="hero-text">
+        This page is designed for the project demo. First generate the authority key pair, then upload a payment screenshot or video to digitally sign it and download the protected output. Later, upload any supported media into the verifier to check whether it still carries valid Digital Trust Shield proof.
+      </p>
+      <p class="hero-text">
+        Start the connected demo with <code>run_demo.bat</code> or by running <code>.\.venv\Scripts\python.exe app.py</code>, then open <code>http://127.0.0.1:5000/demo</code>.
+      </p>
+    </div>
+  </header>
+
+  <main class="section reveal">
+    <section class="demo-shell">
+      <div class="demo-tabs" role="tablist" aria-label="Demo flow">
+        <button class="demo-tab active" type="button" data-panel="sign" aria-pressed="true">Sign In</button>
+        <button class="demo-tab" type="button" data-panel="verify" aria-pressed="false">Verify</button>
+      </div>
+
+      <section class="demo-panel active" id="panel-sign">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Digital Signing</p>
+            <h2>Step 1: Generate the RSA key pair and sign a payment screenshot or video</h2>
+          </div>
+          <div class="status-pill" id="key-pill">Checking key status...</div>
+        </div>
+
+        <div class="workspace-grid">
+          <article class="action-card">
+            <h3>1. Generate RSA Key</h3>
+            <p>
+              Use the existing <code>generate_keys.py</code> flow to create the authority key pair before signing any screenshot or video.
+            </p>
+            <button class="button button-primary action-button" id="generate-keys-button" type="button">Generate RSA Key</button>
+            <div class="result-banner info" id="generate-result">No new key generated in this session yet.</div>
+          </article>
+
+          <article class="action-card">
+            <h3>2. Upload and digitally sign</h3>
+            <p>
+              Upload a payment screenshot or video. The app will sign it, embed the invisible proof into the visual content, and prepare a download link for the protected output.
+            </p>
+
+            <form id="sign-form" class="upload-form">
+              <label class="file-drop" for="sign-file">
+                <span>Choose screenshot or video</span>
+                <input id="sign-file" name="file" type="file" accept=".png,.jpg,.jpeg,.mp4,.mov,.avi,.mkv,.m4v" required>
+              </label>
+              <button class="button button-primary action-button" id="sign-button" type="submit">Digitally Sign Media</button>
+            </form>
+
+            <div class="preview-card">
+              <p class="preview-label">Selected media preview</p>
+              <img id="sign-preview" alt="Selected payment screenshot preview" class="upload-preview hidden">
+              <video id="sign-preview-video" class="upload-preview hidden" controls muted playsinline></video>
+              <p class="preview-empty" id="sign-preview-empty">No media selected yet.</p>
+            </div>
+
+            <div class="result-banner info" id="sign-result">Generate keys and upload a screenshot or video to begin.</div>
+            <a class="button button-secondary download-link hidden" id="download-link" href="#">Download Signed Output</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="demo-panel" id="panel-verify">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Verification</p>
+            <h2>Step 2: Check whether an uploaded image or video is authentic</h2>
+          </div>
+          <div class="status-pill neutral">Verifier uses the public key</div>
+        </div>
+
+        <div class="workspace-grid">
+          <article class="action-card">
+            <h3>Upload media to verify</h3>
+            <p>
+              Upload the signed screenshot, signed video, or any other supported media. If the hidden proof is valid, the result will be marked as authentic. Otherwise it will be flagged as tampered, unsigned, or unverified.
+            </p>
+
+            <form id="verify-form" class="upload-form">
+              <label class="file-drop" for="verify-file">
+                <span>Choose media for verification</span>
+                <input id="verify-file" name="file" type="file" accept=".png,.jpg,.jpeg,.mp4,.mov,.avi,.mkv,.m4v" required>
+              </label>
+              <button class="button button-primary action-button" id="verify-button" type="submit">Verify Media</button>
+            </form>
+
+            <div class="preview-card">
+              <p class="preview-label">Verification preview</p>
+              <img id="verify-preview" alt="Verification screenshot preview" class="upload-preview hidden">
+              <video id="verify-preview-video" class="upload-preview hidden" controls muted playsinline></video>
+              <p class="preview-empty" id="verify-preview-empty">No media selected yet.</p>
+            </div>
+          </article>
+
+          <article class="action-card result-card" id="verify-result-card">
+            <h3>Verification Output</h3>
+            <div class="result-status" id="verify-status">Waiting for verification</div>
+            <p class="result-detail" id="verify-detail">
+              Upload media and run verification to see whether the proof is valid.
+            </p>
+          </article>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="demo.js"></script>
+</body>
+</html>

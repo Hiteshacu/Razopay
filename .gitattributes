@@ -1,0 +1,18 @@
+# Auto-detect text files and normalize line endings to LF in the repo
+* text=auto eol=lf
+
+# Windows shell scripts keep CRLF
+*.bat text eol=crlf
+
+# Binary files — no line ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.apk binary
+*.dex binary
+*.jar binary
+*.keystore binary
+*.jks binary

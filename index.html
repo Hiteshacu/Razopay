@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digital Trust Shield | Rural Banking Trust Frontend</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-glow page-glow-left" aria-hidden="true"></div>
+  <div class="page-glow page-glow-right" aria-hidden="true"></div>
+
+  <header class="hero section reveal">
+    <nav class="topbar" aria-label="Primary">
+      <div class="brand-lockup">
+        <span class="brand-mark">DTS</span>
+        <div>
+          <p class="brand-name">Digital Trust Shield</p>
+          <p class="brand-tag">Adaptive cybersecurity for trusted rural banking</p>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="topbar-links">
+          <a href="#workflow">Flow</a>
+          <a href="#use-cases">Use Cases</a>
+          <a href="#modules">File Mapping</a>
+        </div>
+        <a class="button button-demo topbar-demo" href="demo.html">Demo</a>
+      </div>
+    </nav>
+
+    <div class="hero-layout">
+      <section class="hero-copy">
+        <p class="eyebrow">Problem Statement</p>
+        <p class="problem-line">
+          Develop an adaptive cybersecurity framework that enhances trust, security, and accessibility in rural digital banking ecosystems.
+        </p>
+        <h1>Every <span>Payment Successful</span> gateway screen should become a trusted proof, not an editable screenshot.</h1>
+        <p class="hero-text">
+          This frontend repositions your existing Digital Trust Shield engine for rural banking. The same RSA signing, perceptual fingerprinting, invisible watermarking, PDF support, and verification flow now protect payment receipts, beneficiary slips, account statements, and shared transaction confirmations.
+        </p>
+
+        <div class="hero-actions">
+          <a class="button button-primary" href="#workflow">See Project Flow</a>
+          <a class="button button-secondary" href="#modules">See Code Mapping</a>
+        </div>
+
+        <div class="hero-points">
+          <article class="mini-card">
+            <h2>Trust</h2>
+            <p>Cryptographic proof binds the payment proof to the real transaction visual.</p>
+          </article>
+          <article class="mini-card">
+            <h2>Security</h2>
+            <p>Invisible watermarking survives forwarding and helps expose fake receipts.</p>
+          </article>
+          <article class="mini-card">
+            <h2>Accessibility</h2>
+            <p>BC agents, merchants, and customers can verify a receipt after sharing.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="hero-visual" aria-label="Payment successful trust preview">
+        <div class="phone-shell">
+          <div class="phone-top"></div>
+          <div class="phone-screen">
+            <div class="screen-header">
+              <p>RuralPay Gateway</p>
+              <span>Live Trust Layer</span>
+            </div>
+
+            <div class="success-badge">Payment Successful</div>
+            <p class="amount">Rs. 1,850.00</p>
+            <p class="beneficiary">Sent to Village Service Center</p>
+
+            <div class="transaction-panel">
+              <div>
+                <span>Txn ID</span>
+                <strong>RBI-UPI-84X2Q9</strong>
+              </div>
+              <div>
+                <span>Receipt status</span>
+                <strong>Signed and watermarked</strong>
+              </div>
+              <div>
+                <span>Delivery route</span>
+                <strong>WhatsApp / PDF / Screenshot</strong>
+              </div>
+            </div>
+
+            <div class="proof-strip">
+              <span class="proof-dot"></span>
+              Hidden proof embedded inside receipt pixels
+            </div>
+
+            <div class="signal-grid" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        </div>
+
+        <article class="floating-panel floating-panel-top">
+          <p>Forwarded Receipt</p>
+          <strong>Still verifiable after compression</strong>
+        </article>
+
+        <article class="floating-panel floating-panel-bottom">
+          <p>Statement PDF</p>
+          <strong>Page-level authenticity check</strong>
+        </article>
+      </section>
+    </div>
+  </header>
+
+  <main>
+    <section class="section reveal">
+      <div class="section-heading">
+        <p class="eyebrow">Why This Fits Rural Banking</p>
+        <h2>A trust layer for receipts, shared screenshots, and document proofs</h2>
+      </div>
+
+      <div class="three-up">
+        <article class="feature-card">
+          <p class="feature-index">01</p>
+          <h3>Stops fake payment screenshots</h3>
+          <p>
+            A forged "paid" screen can mislead merchants or BC agents. Your existing watermark plus signature pipeline turns the visual proof itself into a bank-verifiable asset.
+          </p>
+        </article>
+
+        <article class="feature-card">
+          <p class="feature-index">02</p>
+          <h3>Works across low-trust sharing channels</h3>
+          <p>
+            In rural workflows, proof often moves through WhatsApp, gallery shares, screenshots, or printed PDFs. The perceptual fingerprinting path is designed for exactly that kind of instability.
+          </p>
+        </article>
+
+        <article class="feature-card">
+          <p class="feature-index">03</p>
+          <h3>Keeps verification simple</h3>
+          <p>
+            The user does not need to understand cryptography. They only need a verifier that says whether the payment proof, banking slip, or statement is authentic or tampered.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section reveal" id="workflow">
+      <div class="section-heading">
+        <p class="eyebrow">Project Flow</p>
+        <h2>The same Digital Trust Shield flow, now anchored to a payment-success journey</h2>
+      </div>
+
+      <div class="workflow-grid">
+        <article class="workflow-card">
+          <p class="workflow-step">Step 1</p>
+          <h3>Payment gateway confirms success</h3>
+          <p>
+            The flow starts when a rural banking app, UPI gateway, or CSP system displays <strong>Payment Successful</strong>. That receipt image or PDF becomes the content we need to protect before sharing.
+          </p>
+        </article>
+
+        <article class="workflow-card">
+          <p class="workflow-step">Step 2</p>
+          <h3><code>generate_keys.py</code> creates the bank authority identity</h3>
+          <p>
+            An RSA key pair is generated. The private key stays sealed with Windows DPAPI, while the public key can be distributed to verifier apps used by bank staff, field agents, or merchants.
+          </p>
+        </article>
+
+        <article class="workflow-card">
+          <p class="workflow-step">Step 3</p>
+          <h3><code>utils.py</code> computes a stable visual fingerprint</h3>
+          <p>
+            Instead of signing raw bytes, the system canonicalizes the receipt or statement visual, removes watermark carrier noise, and builds a dHash + pHash style fingerprint that survives moderate recompression.
+          </p>
+        </article>
+
+        <article class="workflow-card">
+          <p class="workflow-step">Step 4</p>
+          <h3><code>sign_poster.py</code> signs the banking proof</h3>
+          <p>
+            The bank signs the SHA-256 digest of that fingerprint using RSA-PSS. This becomes the cryptographic proof that the displayed receipt or document was issued by the trusted authority.
+          </p>
+        </article>
+
+        <article class="workflow-card">
+          <p class="workflow-step">Step 5</p>
+          <h3><code>watermark_embedder.py</code> hides proof inside the visual</h3>
+          <p>
+            The signed payload is embedded invisibly across DCT blocks in the luminance channel, so the trust proof stays inside the receipt screenshot, passbook image, or transaction confirmation itself.
+          </p>
+        </article>
+
+        <article class="workflow-card">
+          <p class="workflow-step">Step 6</p>
+          <h3>Sharing happens through real rural channels</h3>
+          <p>
+            Customers, merchants, and BC agents may forward the proof through WhatsApp, save it as JPEG, export it as PDF, or resend screenshots. The design expects those transformations.
+          </p>
+        </article>
+
+        <article class="workflow-card">
+          <p class="workflow-step">Step 7</p>
+          <h3><code>watermark_extractor.py</code> and <code>verify_poster.py</code> validate it later</h3>
+          <p>
+            The verifier extracts the hidden signature, recomputes the current fingerprint, checks RSA validity with the public key, and compares distances to decide whether the banking proof is authentic or fake.
+          </p>
+        </article>
+
+        <article class="workflow-card">
+          <p class="workflow-step">Step 8</p>
+          <h3><code>pdf_support.py</code> handles multi-page banking documents</h3>
+          <p>
+            Statements, sanction letters, claim forms, or subsidy PDFs can be signed page by page, then verified page by page, so a tampered document reveals the exact compromised page.
+          </p>
+        </article>
+
+        <article class="workflow-card">
+          <p class="workflow-step">Step 9</p>
+          <h3>Audit logs preserve accountability</h3>
+          <p>
+            Signing and verification events are written to hash-chained logs, helping the bank prove who signed what, when it was verified, and whether someone tried to alter trust records.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section reveal" id="use-cases">
+      <div class="section-heading">
+        <p class="eyebrow">Adaptive Use Cases</p>
+        <h2>Switch the story between receipt, document, and field verification modes</h2>
+      </div>
+
+      <div class="scenario-shell">
+        <div class="scenario-controls" role="tablist" aria-label="Use case selector">
+          <button class="scenario-button active" type="button" data-scenario="receipt" aria-pressed="true">UPI Receipt</button>
+          <button class="scenario-button" type="button" data-scenario="statement" aria-pressed="false">Statement PDF</button>
+          <button class="scenario-button" type="button" data-scenario="field" aria-pressed="false">BC Agent Check</button>
+        </div>
+
+        <div class="scenario-display">
+          <article class="scenario-copy">
+            <p class="scenario-label" id="scenario-label">Receipt-first trust</p>
+            <h3 id="scenario-title">A merchant receives a shared payment screenshot and wants instant authenticity.</h3>
+            <p id="scenario-text">
+              The signed receipt keeps its proof inside the image itself, so even after forwarding the merchant can verify that the bank-generated payment confirmation was not edited.
+            </p>
+            <ul class="scenario-points" id="scenario-points">
+              <li>Invisible watermark travels with the screenshot.</li>
+              <li>Perceptual fingerprint tolerates moderate compression noise.</li>
+              <li>Result can return authentic, fake, or tampered.</li>
+            </ul>
+          </article>
+
+          <article class="scenario-meter">
+            <div class="meter-header">
+              <p>Framework emphasis</p>
+              <span id="scenario-chip">Trust + Security</span>
+            </div>
+            <div class="meter-row">
+              <span>Trust</span>
+              <div class="meter-bar"><i id="meter-trust" style="width: 92%;"></i></div>
+            </div>
+            <div class="meter-row">
+              <span>Security</span>
+              <div class="meter-bar"><i id="meter-security" style="width: 94%;"></i></div>
+            </div>
+            <div class="meter-row">
+              <span>Accessibility</span>
+              <div class="meter-bar"><i id="meter-accessibility" style="width: 78%;"></i></div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section reveal" id="modules">
+      <div class="section-heading">
+        <p class="eyebrow">Same Codebase, New Context</p>
+        <h2>How each existing file maps into the rural banking solution</h2>
+      </div>
+
+      <div class="module-grid">
+        <article class="module-card">
+          <h3><code>generate_keys.py</code></h3>
+          <p>Creates the bank or payment-authority RSA key pair that anchors trust.</p>
+        </article>
+        <article class="module-card">
+          <h3><code>sign_poster.py</code></h3>
+          <p>Signs payment receipts, QR success screens, and exported banking visuals before they are shared.</p>
+        </article>
+        <article class="module-card">
+          <h3><code>verify_poster.py</code></h3>
+          <p>Verifies whether a received receipt or proof-of-payment image is authentic or tampered.</p>
+        </article>
+        <article class="module-card">
+          <h3><code>watermark_embedder.py</code></h3>
+          <p>Hides the signed trust bundle invisibly inside the banking image using DCT-based embedding.</p>
+        </article>
+        <article class="module-card">
+          <h3><code>watermark_extractor.py</code></h3>
+          <p>Recovers the hidden trust proof after screenshotting, compression, resizing, or forwarding.</p>
+        </article>
+        <article class="module-card">
+          <h3><code>pdf_support.py</code></h3>
+          <p>Extends the same trust flow to multi-page statements, certificates, and rural banking PDFs.</p>
+        </article>
+        <article class="module-card">
+          <h3><code>utils.py</code></h3>
+          <p>Holds the key sealing, perceptual fingerprinting, signing helpers, verification thresholds, and audit logging backbone.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <div class="section-heading">
+        <p class="eyebrow">Decision States</p>
+        <h2>The frontend can clearly explain what the verifier concludes</h2>
+      </div>
+
+      <div class="decision-grid">
+        <article class="decision-card authentic">
+          <p class="decision-tag">Authentic</p>
+          <h3>Signed by the trusted authority</h3>
+          <p>Signature validates, the extracted fingerprint matches the received receipt closely, and the proof survived sharing.</p>
+        </article>
+
+        <article class="decision-card caution">
+          <p class="decision-tag">Forwarded But Valid</p>
+          <h3>Compressed, resized, still trusted</h3>
+          <p>The receipt changed format during WhatsApp or gallery sharing, but the watermark extractor and fingerprint thresholds still confirm authenticity.</p>
+        </article>
+
+        <article class="decision-card danger">
+          <p class="decision-tag">Fake or Tampered</p>
+          <h3>Edited content or invalid signature</h3>
+          <p>If someone changes amount, beneficiary, page content, or inserts a false screenshot, the signature or fingerprint comparison will fail.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section reveal">
+      <div class="section-heading">
+        <p class="eyebrow">Honest Limitation</p>
+        <h2>Strong prototype today, extensible platform tomorrow</h2>
+      </div>
+
+      <div class="closing-panel">
+        <p>
+          This frontend presents the project as an adaptive rural banking cybersecurity framework, but the current core is still a prototype engine. The next production step would be exposing these Python modules through a secure backend API, linking them to payment events, and distributing a lightweight verifier app for field use.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer section reveal">
+    <p>Digital Trust Shield frontend concept for rural digital banking trust, security, and accessibility.</p>
+    <p>Built from the existing signing, watermarking, verification, PDF, and audit-log pipeline in this repository.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
