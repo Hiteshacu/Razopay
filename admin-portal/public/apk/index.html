@@ -80,6 +80,15 @@
     border-radius: 10px; padding: 0.85rem 1rem; font-size: 0.88rem;
   }
   .notice b { display: block; margin-bottom: 0.15rem; }
+  .notice code {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.85em; word-break: break-all;
+  }
+  .notice.missing { background: #fae4e0; color: #8c2f1f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .notice.missing { background: #35201d; color: #e08a79; }
+  }
+  .download[aria-disabled="true"] { opacity: 0.45; pointer-events: none; }
 
   .qr-wrap {
     display: flex; flex-direction: column; align-items: center; gap: 0.7rem;
@@ -102,10 +111,16 @@
       <p class="sub">Install the verifier app, pick any notice, receipt or poster you were sent, and find out in seconds whether it is genuine or has been edited.</p>
     </header>
 
-    <a class="download" href="./trust-shield.apk" download>
+    <a class="download" id="download" href="./trust-shield.apk" download>
       Download the app
       <small>Android · about 15 MB</small>
     </a>
+
+    <p class="notice missing" id="missing" hidden>
+      <b>The app file is not published yet</b>
+      Downloading now would save a web page instead of the app. Build the APK
+      and publish it to <code>public/apk/trust-shield.apk</code>.
+    </p>
 
     <ol class="steps">
       <li>Tap <b>Download the app</b> above.</li>
@@ -126,5 +141,27 @@
 
     <p class="foot">Verification runs against <a href="https://trust-shield-api.onrender.com/api/health">the Trust Shield service</a>. Nothing you upload is kept.</p>
   </main>
+
+<script>
+  // A missing file on this host is answered with the single-page app's HTML
+  // rather than a 404, so an absent APK would download as a web page named
+  // .apk and only reveal itself when someone tries to install it. Check the
+  // response type up front and block the download if it is not an APK.
+  // Purely additive: if the check cannot run, the link behaves as normal.
+  (function () {
+    var link = document.getElementById("download");
+    var warning = document.getElementById("missing");
+    if (!link || !warning || typeof fetch !== "function") return;
+
+    fetch(link.getAttribute("href"), { method: "HEAD" })
+      .then(function (response) {
+        var type = (response.headers.get("content-type") || "").toLowerCase();
+        if (response.ok && type.indexOf("html") === -1) return;
+        link.setAttribute("aria-disabled", "true");
+        warning.hidden = false;
+      })
+      .catch(function () { /* offline or blocked — leave the link alone */ });
+  })();
+</script>
 </body>
 </html>
