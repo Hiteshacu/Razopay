@@ -111,7 +111,10 @@
       <p class="sub">Install the verifier app, pick any notice, receipt or poster you were sent, and find out in seconds whether it is genuine or has been edited.</p>
     </header>
 
-    <a class="download" id="download" href="./trust-shield.apk" download>
+    <!-- Absolute, not relative: this page answers at /apk with no trailing
+         slash, so a relative href resolves against the site root and asks for
+         /trust-shield.apk, which the SPA fallback answers with HTML. -->
+    <a class="download" id="download" href="/apk/trust-shield.apk" download>
       Download the app
       <small>Android · about 15 MB</small>
     </a>
