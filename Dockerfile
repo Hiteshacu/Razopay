@@ -44,5 +44,7 @@ RUN mkdir -p /data/uploads /data/secure_private_keys
 WORKDIR /app/backend
 EXPOSE 8000
 
-# Shell form so ${PORT} expands — Render injects the port to bind.
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Needs a shell so ${PORT} expands (Render injects the port to bind), but
+# `exec` hands the process over to uvicorn so it receives SIGTERM directly
+# and shuts down promptly on redeploy.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

@@ -25,8 +25,17 @@ class KeyService:
         audit: AuditService | None = None,
     ) -> None:
         self.firebase = firebase or FirebaseService()
-        self.key_store = key_store or PrivateKeyStore()
+        self._key_store = key_store
         self.audit = audit or AuditService(self.firebase)
+
+    @property
+    def key_store(self) -> PrivateKeyStore:
+        # Built on first use rather than in __init__ so read-only endpoints —
+        # notably GET /api/keys/public, the Android app's first call — keep
+        # working when MASTER_KEY is absent. Only key generation needs it.
+        if self._key_store is None:
+            self._key_store = PrivateKeyStore()
+        return self._key_store
 
     def create_authority(self, payload: AuthorityCreate) -> dict:
         authority_id = f"auth_{uuid4().hex[:12]}"
