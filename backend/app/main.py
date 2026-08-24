@@ -43,18 +43,24 @@ def startup_checks():
     # proof needed to recover a watermark from a forwarded or screenshotted
     # image disappears the next time the container restarts.
     if settings.registry_backend == "firestore":
-        import sys
-        from pathlib import Path as _Path
+        # Never let this abort startup. A service that refuses to boot cannot
+        # serve /api/health, so the host reports a failed deploy instead of a
+        # running service with one degraded subsystem.
+        try:
+            import sys
+            from pathlib import Path as _Path
 
-        project_root = _Path(__file__).resolve().parents[2]
-        if str(project_root) not in sys.path:
-            sys.path.insert(0, str(project_root))
+            project_root = _Path(__file__).resolve().parents[2]
+            if str(project_root) not in sys.path:
+                sys.path.insert(0, str(project_root))
 
-        from utils import set_registry_storage
+            from utils import set_registry_storage
 
-        from .services.registry_storage import FirestoreRegistryStorage
+            from .services.registry_storage import FirestoreRegistryStorage
 
-        set_registry_storage(FirestoreRegistryStorage())
+            set_registry_storage(FirestoreRegistryStorage())
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"WARNING: Firestore registry backend not installed: {exc}")
 
 
 @app.get("/api/health")

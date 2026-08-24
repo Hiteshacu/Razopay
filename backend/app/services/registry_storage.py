@@ -28,7 +28,17 @@ MAX_ENTRIES_BYTES = 800_000
 
 class FirestoreRegistryStorage:
     def __init__(self, firebase: FirebaseService | None = None) -> None:
-        self.firebase = firebase or FirebaseService()
+        self._firebase = firebase
+
+    @property
+    def firebase(self) -> FirebaseService:
+        # Connected on first use, not construction. The service is registered
+        # during application startup, which on a fresh host can run before the
+        # credentials file has been uploaded — building the client here would
+        # abort startup and fail the deploy.
+        if self._firebase is None:
+            self._firebase = FirebaseService()
+        return self._firebase
 
     def load(self) -> dict[str, Any] | None:
         document = self.firebase.get_document(COLLECTION, DOCUMENT_ID)

@@ -1,14 +1,12 @@
 name: CodeQL
 
+# Manual trigger only.
+#
+# Code scanning needs GitHub Advanced Security to upload results, and this
+# repository is private, so every automatic run failed at the upload step and
+# mailed a failure notice. Re-enable the push/schedule triggers if the
+# repository is made public or Advanced Security is enabled.
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-  schedule:
-    - cron: "19 3 * * 1"
   workflow_dispatch:
 
 env:
@@ -52,7 +50,7 @@ jobs:
 
       - name: Build Android app
         if: matrix.language == 'java-kotlin'
-        working-directory: verification_app
+        working-directory: android-verifier
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon :app:assembleDebug
