@@ -15,17 +15,15 @@ services:
     name: trust-shield-api
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: standard          # 2 GB RAM. `starter` works for small posters only.
+    # Free instances have 512 MB RAM and no persistent disk, and they spin
+    # down after ~15 minutes idle. Measured peak while signing a 1600px
+    # poster: 264 MB, so the memory headroom is fine. Because there is no
+    # disk, the registry and encrypted private keys live in Firestore
+    # instead — see REGISTRY_BACKEND / KEY_STORE_BACKEND below.
+    plan: free
     region: singapore       # closest to India — lowest latency for the demo
     healthCheckPath: /api/health
     autoDeployTrigger: commit
-
-    # Survives redeploys: registry, audit trail, encrypted keys, signed files.
-    # A service with a disk runs as a single instance — fine for a demo.
-    disk:
-      name: trust-shield-data
-      mountPath: /data
-      sizeGB: 1
 
     envVars:
       # --- Secrets: entered once in the Render dashboard, never committed ---
@@ -56,13 +54,15 @@ services:
         value: "false"
       - key: CORS_ORIGINS
         value: https://trust-shield-admin.onrender.com
-      # Runtime write locations — must sit under the disk mount at /data
-      - key: DTS_DATA_DIR
-        value: /data
-      - key: LOCAL_UPLOAD_DIR
-        value: /data/uploads
-      - key: SECURE_KEYS_DIR
-        value: /data/secure_private_keys
+
+      # There is no persistent disk on the free plan, so the two pieces of
+      # state that must outlive a restart are kept in Firestore. Private keys
+      # are stored as Fernet ciphertext only — MASTER_KEY never leaves this
+      # environment, so Firestore never holds anything usable.
+      - key: REGISTRY_BACKEND
+        value: firestore
+      - key: KEY_STORE_BACKEND
+        value: firestore
 
   # ---------------------------------------------------------------
   # Admin portal (free static hosting) + the judges' APK download page

@@ -549,6 +549,15 @@ def _verify_screenshot_recovery(
 
 MIN_WATERMARK_CORRELATION = 0.53
 MIN_WATERMARK_SIGNED_MARGIN = 0.02
+# How many registry candidates a recovery pass will actually test.
+#
+# Fingerprint proximity alone is a loose filter: a batch of visually similar
+# documents — payment receipts from the same app, say — all land inside the
+# recovery distance thresholds. With a low cap the genuine entry gets crowded
+# out by near-duplicates and recovery fails even though the watermark is
+# intact. Each rejected candidate is cheap because the correlation check exits
+# as soon as the signature or fingerprint disagrees.
+REGISTRY_MATCH_ATTEMPT_LIMIT = 24
 SIGNATURE_PAYLOAD_BIT_START = (
     len(WATERMARK_MAGIC)
     + WATERMARK_CHECKSUM_BYTES
@@ -683,7 +692,7 @@ def _verify_full_frame_registry_recovery(
         if dimensions is None:
             continue
         attempted_match_count += 1
-        if attempted_match_count > 6:
+        if attempted_match_count > REGISTRY_MATCH_ATTEMPT_LIMIT:
             break
 
         target_width, target_height = dimensions

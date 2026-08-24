@@ -36,6 +36,10 @@ class Settings:
     use_local_storage: bool = _env_bool("USE_LOCAL_STORAGE", True)
     local_upload_dir: str = os.getenv("LOCAL_UPLOAD_DIR", "uploads")
     secure_keys_dir: str = os.getenv("SECURE_KEYS_DIR", "secure_private_keys")
+    # "local" keeps state on disk; "firestore" is for hosts without durable
+    # storage, such as a free Render instance.
+    registry_backend: str = os.getenv("REGISTRY_BACKEND", "local").strip().lower()
+    key_store_backend: str = os.getenv("KEY_STORE_BACKEND", "local").strip().lower()
     firebase_storage_bucket: str = os.getenv("FIREBASE_STORAGE_BUCKET", "")
     master_key: str = os.getenv("MASTER_KEY", "")
     admin_username: str = os.getenv("ADMIN_USERNAME", "admin")

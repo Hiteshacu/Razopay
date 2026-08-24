@@ -84,6 +84,22 @@ FORWARDED_SHARE_JPEG_QUALITY = 62
 _REGISTRY_CACHE_DATA: dict[str, object] | None = None
 _REGISTRY_CACHE_MTIME_NS: int | None = None
 _REGISTRY_DIMENSION_CACHE: dict[str, tuple[int, int] | None] = {}
+# Optional external home for the signed-asset registry. Left unset the engine
+# reads and writes official_registry.json as before, which is what the CLI and
+# local demo expect. A host without durable local storage installs a backend
+# here instead so the registry survives a restart. The engine only requires
+# two methods, load() and save(data), so it stays free of any cloud SDK.
+_REGISTRY_STORAGE: object | None = None
+
+
+def set_registry_storage(storage: object | None) -> None:
+    """Route registry reads and writes through an external backend."""
+    global _REGISTRY_STORAGE, _REGISTRY_CACHE_DATA, _REGISTRY_CACHE_MTIME_NS
+    global _REGISTRY_DIMENSION_CACHE
+    _REGISTRY_STORAGE = storage
+    _REGISTRY_CACHE_DATA = None
+    _REGISTRY_CACHE_MTIME_NS = None
+    _REGISTRY_DIMENSION_CACHE = {}
 
 
 class DATA_BLOB(ctypes.Structure):
@@ -285,6 +301,12 @@ def resolve_project_path(path: str | Path) -> Path:
 
 def _load_registry_data() -> dict[str, object]:
     global _REGISTRY_CACHE_DATA, _REGISTRY_CACHE_MTIME_NS, _REGISTRY_DIMENSION_CACHE
+    if _REGISTRY_STORAGE is not None:
+        if _REGISTRY_CACHE_DATA is None:
+            _REGISTRY_CACHE_DATA = _REGISTRY_STORAGE.load() or {"version": 1, "entries": []}
+            _REGISTRY_DIMENSION_CACHE = {}
+        return _REGISTRY_CACHE_DATA
+
     if not SIGNED_REGISTRY_PATH.exists():
         _REGISTRY_CACHE_DATA = {"version": 1, "entries": []}
         _REGISTRY_CACHE_MTIME_NS = None
@@ -303,6 +325,12 @@ def _load_registry_data() -> dict[str, object]:
 
 def _write_registry_data(data: dict[str, object]) -> Path:
     global _REGISTRY_CACHE_DATA, _REGISTRY_CACHE_MTIME_NS, _REGISTRY_DIMENSION_CACHE
+    if _REGISTRY_STORAGE is not None:
+        _REGISTRY_STORAGE.save(data)
+        _REGISTRY_CACHE_DATA = data
+        _REGISTRY_DIMENSION_CACHE = {}
+        return SIGNED_REGISTRY_PATH
+
     SIGNED_REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
     _set_read_only(SIGNED_REGISTRY_PATH, enabled=False)
     SIGNED_REGISTRY_PATH.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")

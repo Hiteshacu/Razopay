@@ -39,6 +39,23 @@ app.include_router(audit.router)
 def startup_checks():
     ensure_local_storage_dirs()
 
+    # Without a persistent disk the registry has to live in Firestore, or the
+    # proof needed to recover a watermark from a forwarded or screenshotted
+    # image disappears the next time the container restarts.
+    if settings.registry_backend == "firestore":
+        import sys
+        from pathlib import Path as _Path
+
+        project_root = _Path(__file__).resolve().parents[2]
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+
+        from utils import set_registry_storage
+
+        from .services.registry_storage import FirestoreRegistryStorage
+
+        set_registry_storage(FirestoreRegistryStorage())
+
 
 @app.get("/api/health")
 def health_check():
@@ -63,6 +80,10 @@ def health_check():
         "firestore": firestore_status,
         "storage_mode": settings.storage_mode,
         "firebase_storage": firebase_storage_status,
+        "persistence": {
+            "registry": settings.registry_backend,
+            "private_keys": settings.key_store_backend,
+        },
         "chatbot": {
             "tavily": "configured" if settings.tavily_api_key else "missing",
             "groq": "configured" if settings.groq_api_key else "missing",
