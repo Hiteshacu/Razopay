@@ -20,21 +20,35 @@ export default function App() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loadError, setLoadError] = useState("");
 
+  async function loadAll() {
+    const [authorityData, keyData, documentData, auditData] = await Promise.all([
+      listAuthorities(),
+      listPublicKeys(),
+      listDocuments(),
+      listAuditLogs()
+    ]);
+    setAuthorities(authorityData);
+    setKeys(keyData);
+    setDocuments(documentData);
+    setAuditLogs(auditData);
+  }
+
   async function refresh() {
     setLoadError("");
     try {
-      const [authorityData, keyData, documentData, auditData] = await Promise.all([
-        listAuthorities(),
-        listPublicKeys(),
-        listDocuments(),
-        listAuditLogs()
-      ]);
-      setAuthorities(authorityData);
-      setKeys(keyData);
-      setDocuments(documentData);
-      setAuditLogs(auditData);
-    } catch (exc) {
-      setLoadError("Backend or Firebase is not ready. Start FastAPI and check backend/.env.");
+      await loadAll();
+    } catch {
+      // An idle server sleeps and takes up to a minute to answer its first
+      // request, which is indistinguishable from an outage on the first try.
+      // Say so plainly and retry once before reporting a real failure.
+      setLoadError("Waking the server up. This can take up to a minute on the first request.");
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 6000));
+        await loadAll();
+        setLoadError("");
+      } catch {
+        setLoadError("Could not reach the Trust Shield service. Check that it is running, then reload.");
+      }
     }
   }
 

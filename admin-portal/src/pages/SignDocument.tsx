@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useState } from "react";
-import { Authority, PublicKey } from "../api/client";
+import { Authority, PublicKey, signedFileUrl } from "../api/client";
 import { signDocument } from "../api/signing";
 import { FileUploader } from "../components/FileUploader";
 import { KeySelector } from "../components/KeySelector";
@@ -68,10 +68,20 @@ export function SignDocument({
       {result && (
         <ResultCard title="Document signed successfully" tone="success">
           <p>Document ID: {result.document_id}</p>
-          <p>Storage mode: {result.storage_type}</p>
           <p>Storage: {result.signed_file_storage_path}</p>
-          <p>URL: {result.download_url}</p>
-          <a href={result.download_url} target="_blank" rel="noreferrer">Download Signed Document</a>
+          <a
+            className="download-button"
+            href={signedFileUrl(result)}
+            download={result.signed_filename}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Download signed document
+          </a>
+          <p className="hint">
+            Share this file to demonstrate verification. Signed files are held on the
+            server temporarily, so download it now rather than relying on this link later.
+          </p>
         </ResultCard>
       )}
     </div>

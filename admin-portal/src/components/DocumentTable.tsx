@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SignedDocument } from "../api/client";
+import { SignedDocument, signedFileUrl } from "../api/client";
 
 function FingerprintCell({ hash }: { hash?: string }) {
   const [copied, setCopied] = useState(false);
@@ -51,11 +51,7 @@ export function DocumentTable({ documents }: { documents: SignedDocument[] }) {
               </td>
               <td>{new Date(document.created_at).toLocaleString()}</td>
               <td>
-                <a
-                  href={document.download_url ?? document.signed_file_download_url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
+                <a href={signedFileUrl(document)} target="_blank" rel="noreferrer" download>
                   Download
                 </a>
               </td>

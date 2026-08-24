@@ -40,6 +40,14 @@ class Settings:
     # storage, such as a free Render instance.
     registry_backend: str = os.getenv("REGISTRY_BACKEND", "local").strip().lower()
     key_store_backend: str = os.getenv("KEY_STORE_BACKEND", "local").strip().lower()
+    # Origin used to build download links for signed files. Render injects
+    # RENDER_EXTERNAL_URL automatically, so a deployed instance stops handing
+    # out localhost URLs that only resolve on the machine that signed.
+    public_base_url: str = (
+        os.getenv("PUBLIC_BASE_URL")
+        or os.getenv("RENDER_EXTERNAL_URL")
+        or "http://127.0.0.1:8000"
+    ).rstrip("/")
     firebase_storage_bucket: str = os.getenv("FIREBASE_STORAGE_BUCKET", "")
     master_key: str = os.getenv("MASTER_KEY", "")
     admin_username: str = os.getenv("ADMIN_USERNAME", "admin")

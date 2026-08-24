@@ -40,7 +40,7 @@ class SigningService:
         return f"{safe_stem or 'document'}{suffix}"
 
     def _local_download_url(self, signed_filename: str) -> str:
-        return f"http://127.0.0.1:8000/uploads/signed_documents/{signed_filename}"
+        return f"{settings.public_base_url}/uploads/signed_documents/{signed_filename}"
 
     async def sign_upload(self, file: UploadFile, authority_id: str, key_id: str) -> dict:
         authority = self.firebase.get_document("authorities", authority_id)

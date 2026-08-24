@@ -5,6 +5,30 @@ export const apiClient = axios.create({
   timeout: 120000
 });
 
+/**
+ * Build a download link that works from this browser.
+ *
+ * Records signed before the backend knew its own public address carry a
+ * hardcoded 127.0.0.1 origin, which only resolves on the machine that signed
+ * them. Where that is the case, rebuild the link from the API origin and the
+ * stored path so old documents stay downloadable.
+ */
+export function signedFileUrl(document: {
+  download_url?: string;
+  signed_file_download_url?: string;
+  signed_file_storage_path?: string;
+}): string {
+  const stored = document.download_url ?? document.signed_file_download_url ?? "";
+  const isLoopback = /^https?:\/\/(127\.0\.0\.1|localhost)\b/i.test(stored);
+  if (stored && !isLoopback) return stored;
+
+  const path = (document.signed_file_storage_path ?? "").replace(/^\/+/, "");
+  if (!path) return stored;
+
+  const origin = (apiClient.defaults.baseURL ?? "").replace(/\/+$/, "");
+  return `${origin}/uploads/${path}`;
+}
+
 export type Authority = {
   authority_id: string;
   authority_name: string;

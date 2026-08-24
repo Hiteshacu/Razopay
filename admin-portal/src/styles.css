@@ -263,6 +263,25 @@ th, td {
   white-space: nowrap;
 }
 
+.download-button {
+  display: inline-block;
+  margin: 12px 0 6px;
+  padding: 11px 20px;
+  border-radius: 9px;
+  background: #0f766e;
+  color: #ffffff !important;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.download-button:hover { background: #0b5a54; }
+
+.result-card .hint {
+  font-size: 0.86rem;
+  color: #475569;
+  max-width: 52ch;
+}
+
 .hash-cell {
   display: inline-flex;
   align-items: center;
