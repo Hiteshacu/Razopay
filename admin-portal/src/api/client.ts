@@ -35,6 +35,7 @@ export type SignedDocument = {
   original_filename: string;
   signed_filename?: string;
   file_type: string;
+  visual_fingerprint_hash?: string;
   storage_type?: string;
   download_url?: string;
   signed_file_download_url: string;

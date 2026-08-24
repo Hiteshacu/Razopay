@@ -1,0 +1,47 @@
+# Keep the build context small and free of anything sensitive.
+.git
+.git_old
+.venv
+backend/.venv
+node_modules
+admin-portal
+android-verifier
+docs
+
+# Secrets and key material — supplied at runtime via env vars / secret files
+*.pem
+*.key
+*.enc
+.env
+backend/.env
+backend/secrets
+backend/secure_private_keys
+.private_key_backups
+
+# Runtime state and local artifacts
+official_registry.json
+audit_logs
+backend/uploads
+backend/temp_uploads
+backend/temp_outputs
+demo_runtime
+*.log
+
+# Media and QA output
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.jpg
+*.jpeg
+*.png
+*.pdf
+*.PDF
+qa_*
+graphify-out
+public_github_release
+.safe_publish_*
+.remote_probe
+
+__pycache__
+*.pyc

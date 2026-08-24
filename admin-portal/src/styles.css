@@ -263,6 +263,40 @@ th, td {
   white-space: nowrap;
 }
 
+.hash-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  cursor: pointer;
+  font: inherit;
+}
+
+.hash-cell:hover {
+  border-color: #0f766e;
+}
+
+.hash-cell code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  color: #334155;
+}
+
+.hash-action {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0f766e;
+}
+
+.hash-empty {
+  color: #94a3b8;
+}
+
 .login-shell {
   min-height: 100vh;
   display: grid;

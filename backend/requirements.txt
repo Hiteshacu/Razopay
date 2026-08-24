@@ -1,11 +1,26 @@
-fastapi
-uvicorn[standard]
-python-multipart
-firebase-admin
-cryptography
-opencv-python
-numpy
-Pillow
-PyMuPDF
-pydantic[email]
-httpx
+# Pinned to the versions verified working locally on 2026-08-24.
+# Do not loosen these before the demo — an unpinned build is not the build
+# you tested.
+
+# --- API ---
+fastapi==0.136.1
+uvicorn[standard]==0.47.0
+python-multipart==0.0.28
+pydantic==2.13.4
+email-validator==2.3.0
+httpx==0.28.1
+
+# --- Firebase ---
+firebase-admin==7.4.0
+
+# --- Signing / verification engine ---
+cryptography==48.0.0
+numpy==2.4.4
+Pillow==12.2.0
+PyMuPDF==1.27.2.3
+
+# Headless build: identical API to opencv-python but without the GUI
+# libraries, which do not exist in a slim server container. Using the
+# regular opencv-python here fails at import time on Render, not at build
+# time, which makes it look like a mystery 500.
+opencv-python-headless==4.13.0.92

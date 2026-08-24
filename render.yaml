@@ -1,0 +1,83 @@
+# Render Blueprint — Digital Trust Shield
+#
+# Two services: the Docker API (paid, has the persistent disk) and the admin
+# portal as a free static site.
+#
+# Values marked `sync: false` are NOT stored here. Render prompts for them once
+# at deploy time and keeps them encrypted. Never put MASTER_KEY or API keys in
+# this file — it is committed to git.
+
+services:
+  # ---------------------------------------------------------------
+  # Signing + verification + chatbot API
+  # ---------------------------------------------------------------
+  - type: web
+    name: trust-shield-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: standard          # 2 GB RAM. `starter` works for small posters only.
+    region: singapore       # closest to India — lowest latency for the demo
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+
+    # Survives redeploys: registry, audit trail, encrypted keys, signed files.
+    # A service with a disk runs as a single instance — fine for a demo.
+    disk:
+      name: trust-shield-data
+      mountPath: /data
+      sizeGB: 1
+
+    envVars:
+      # --- Secrets: entered once in the Render dashboard, never committed ---
+      - key: MASTER_KEY
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+      # --- Firebase service account, uploaded as a Render Secret File ---
+      # Dashboard → Environment → Secret Files → filename serviceAccountKey.json
+      - key: FIREBASE_CREDENTIALS
+        value: /etc/secrets/serviceAccountKey.json
+
+      # --- Non-secret configuration ---
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: USE_LOCAL_STORAGE
+        value: "true"
+      - key: FIREBASE_STORAGE_BUCKET
+        value: ""
+      - key: STORAGE_MAKE_PUBLIC
+        value: "false"
+      - key: CORS_ORIGINS
+        value: https://trust-shield-admin.onrender.com
+      # Runtime write locations — must sit under the disk mount at /data
+      - key: DTS_DATA_DIR
+        value: /data
+      - key: LOCAL_UPLOAD_DIR
+        value: /data/uploads
+      - key: SECURE_KEYS_DIR
+        value: /data/secure_private_keys
+
+  # ---------------------------------------------------------------
+  # Admin portal (free static hosting) + the judges' APK download page
+  # ---------------------------------------------------------------
+  - type: web
+    name: trust-shield-admin
+    runtime: static
+    rootDir: admin-portal
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    autoDeployTrigger: commit
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://trust-shield-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
