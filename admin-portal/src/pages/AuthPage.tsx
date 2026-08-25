@@ -1,4 +1,5 @@
 import { ShieldCheck } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import {
@@ -25,6 +26,8 @@ export function AuthPage({
   const [busy, setBusy] = useState(false);
 
   const signingUp = mode === "signup";
+  const reduceMotion = useReducedMotion();
+  const ease = [0.22, 1, 0.36, 1] as const;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -67,12 +70,32 @@ export function AuthPage({
 
   return (
     <main className="login-shell">
-      <section className="login-panel">
-        <div className="login-icon">
+      <motion.section
+        className="login-panel"
+        initial={{ opacity: 0, y: reduceMotion ? 0 : 16, scale: reduceMotion ? 1 : 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.45, ease }}
+      >
+        <motion.div
+          className="login-icon"
+          initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.08, ease }}
+        >
           <ShieldCheck size={34} />
-        </div>
+        </motion.div>
         <p className="eyebrow">Digital Trust Shield</p>
-        <h1>{signingUp ? "Create an authority account" : "Sign in to the console"}</h1>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.h1
+            key={mode}
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: reduceMotion ? 0 : -8 }}
+            transition={{ duration: 0.22, ease }}
+          >
+            {signingUp ? "Create an authority account" : "Sign in to the console"}
+          </motion.h1>
+        </AnimatePresence>
 
         {!firebaseConfigured && (
           <p className="error-text">
@@ -100,21 +123,49 @@ export function AuthPage({
               onChange={(event) => setPassword(event.target.value)}
             />
           </label>
-          {signingUp && (
-            <label>
-              Confirm password
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={confirmation}
-                onChange={(event) => setConfirmation(event.target.value)}
-              />
-            </label>
-          )}
+          <AnimatePresence initial={false}>
+            {signingUp && (
+              <motion.label
+                key="confirm"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.24, ease }}
+                style={{ overflow: "hidden" }}
+              >
+                Confirm password
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmation}
+                  onChange={(event) => setConfirmation(event.target.value)}
+                />
+              </motion.label>
+            )}
+          </AnimatePresence>
 
-          {error && <p className="error-text">{error}</p>}
+          <AnimatePresence>
+            {error && (
+              <motion.p
+                className="error-text"
+                role="alert"
+                initial={{ opacity: 0, y: reduceMotion ? 0 : -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease }}
+              >
+                {error}
+              </motion.p>
+            )}
+          </AnimatePresence>
 
-          <button className="primary-button" type="submit" disabled={busy || !firebaseConfigured}>
+          <motion.button
+            className="primary-button"
+            type="submit"
+            disabled={busy || !firebaseConfigured}
+            whileHover={reduceMotion || busy ? undefined : { y: -2 }}
+            whileTap={reduceMotion || busy ? undefined : { scale: 0.98 }}
+          >
             {busy
               ? signingUp
                 ? "Creating account..."
@@ -122,7 +173,7 @@ export function AuthPage({
               : signingUp
                 ? "Create account"
                 : "Sign in"}
-          </button>
+          </motion.button>
         </form>
 
         <p className="auth-switch">
@@ -136,7 +187,7 @@ export function AuthPage({
             Back to home
           </button>
         </p>
-      </section>
+      </motion.section>
     </main>
   );
 }
