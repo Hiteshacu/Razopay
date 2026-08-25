@@ -84,6 +84,11 @@ android-verifier/local.properties
 dist/
 build/
 
+# Local AI tooling: design skills installed via ui-ux-pro-max-cli and any
+# MCP wiring. Reinstallable with one command, so not worth versioning.
+.claude/skills/
+.mcp.json
+
 # ---------------------------------------------------------------
 # Editor and OS
 # ---------------------------------------------------------------
