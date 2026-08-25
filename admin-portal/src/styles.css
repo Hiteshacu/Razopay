@@ -263,6 +263,26 @@ th, td {
   white-space: nowrap;
 }
 
+.metric-pending {
+  color: #94a3b8;
+  animation: metric-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes metric-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric-pending { animation: none; }
+}
+
+.loading-note {
+  color: #475569;
+  font-size: 0.92rem;
+  max-width: 58ch;
+}
+
 .download-button {
   display: inline-block;
   margin: 12px 0 6px;

@@ -6,6 +6,22 @@ export const apiClient = axios.create({
 });
 
 /**
+ * Nudge the service awake without waiting for the answer.
+ *
+ * An idle instance sleeps and needs the better part of a minute to serve its
+ * first request. Sending this the moment the page opens means the wake-up
+ * overlaps with the operator reading the login screen and typing, instead of
+ * happening afterwards while they stare at an empty dashboard.
+ */
+export function wakeService(): void {
+  const origin = (apiClient.defaults.baseURL ?? "").replace(/\/+$/, "");
+  if (!origin) return;
+  void fetch(`${origin}/api/health`).catch(() => {
+    /* the point is to start the wake-up, not to read the reply */
+  });
+}
+
+/**
  * Build a download link that works from this browser.
  *
  * Records signed before the backend knew its own public address carry a

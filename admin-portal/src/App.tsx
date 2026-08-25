@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AuditLog, Authority, PublicKey, SignedDocument } from "./api/client";
+import { AuditLog, Authority, PublicKey, SignedDocument, wakeService } from "./api/client";
 import { listAuditLogs, listDocuments } from "./api/documents";
 import { listAuthorities, listPublicKeys } from "./api/keys";
 import { Navbar, View } from "./components/Navbar";
@@ -19,6 +19,7 @@ export default function App() {
   const [documents, setDocuments] = useState<SignedDocument[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   async function loadAll() {
     const [authorityData, keyData, documentData, auditData] = await Promise.all([
@@ -35,6 +36,7 @@ export default function App() {
 
   async function refresh() {
     setLoadError("");
+    setLoading(true);
     try {
       await loadAll();
     } catch {
@@ -49,8 +51,16 @@ export default function App() {
       } catch {
         setLoadError("Could not reach the Trust Shield service. Check that it is running, then reload.");
       }
+    } finally {
+      setLoading(false);
     }
   }
+
+  // Start waking the service as the page opens, before anyone signs in, so the
+  // spin-up runs while the login screen is on show rather than afterwards.
+  useEffect(() => {
+    wakeService();
+  }, []);
 
   useEffect(() => {
     if (authenticated) {
@@ -67,7 +77,7 @@ export default function App() {
       <Navbar view={view} onChange={setView} />
       <section className="workspace">
         {loadError && <div className="status-banner">{loadError}</div>}
-        {view === "dashboard" && <Dashboard authorities={authorities} keys={keys} documents={documents} auditLogs={auditLogs} />}
+        {view === "dashboard" && <Dashboard authorities={authorities} keys={keys} documents={documents} auditLogs={auditLogs} loading={loading} />}
         {view === "authorities" && <Authorities authorities={authorities} onChanged={refresh} />}
         {view === "keys" && <KeyManagement authorities={authorities} keys={keys} onChanged={refresh} />}
         {view === "sign" && <SignDocument authorities={authorities} keys={keys} onSigned={refresh} />}
