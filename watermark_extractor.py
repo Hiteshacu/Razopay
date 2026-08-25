@@ -23,6 +23,8 @@ RESIZE_RECOVERY_FACTORS = (
 try:
     from .utils import (
         BLOCK_SIZE,
+        DCT_MATRIX,
+        image_to_blocks,
         REFERENCE_FINGERPRINT_BYTES,
         RSA_SIGNATURE_BYTES,
         WATERMARK_EXTRACT_COEFFICIENT_LAYOUTS,
@@ -41,6 +43,8 @@ try:
 except ImportError:
     from utils import (
         BLOCK_SIZE,
+        DCT_MATRIX,
+        image_to_blocks,
         REFERENCE_FINGERPRINT_BYTES,
         RSA_SIGNATURE_BYTES,
         WATERMARK_EXTRACT_COEFFICIENT_LAYOUTS,
@@ -71,6 +75,41 @@ def _extract_bit_votes_from_block(
         votes += int(dct_block[a_row, a_col] >= dct_block[b_row, b_col])
         total_votes += 1
     return votes, total_votes
+
+
+def _votes_per_block(
+    luminance: np.ndarray,
+    coefficient_pairs: tuple[tuple[tuple[int, int], tuple[int, int]], ...],
+) -> tuple[np.ndarray, int]:
+    """Carrier votes for every block in the image, in one batched pass.
+
+    Reading a payload used to transform one 8x8 block per bit per repetition —
+    around 15,000 individual DCT calls for a megapixel image, nearly all of it
+    interpreter and call overhead. Every block is independent, so the whole
+    plane is transformed at once and each bit becomes an array lookup.
+
+    Block ordering matches block_coordinates(): index = row * blocks_per_row
+    + column, so existing permutations index the result unchanged.
+    """
+    blocks = image_to_blocks(luminance) - 128.0
+    coefficients = DCT_MATRIX @ blocks @ DCT_MATRIX.T
+    flat = coefficients.reshape(-1, BLOCK_SIZE, BLOCK_SIZE)
+
+    votes = np.zeros(flat.shape[0], dtype=np.int32)
+    for (a_row, a_col), (b_row, b_col) in coefficient_pairs:
+        votes += (flat[:, a_row, a_col] >= flat[:, b_row, b_col]).astype(np.int32)
+    return votes, len(coefficient_pairs)
+
+
+def _gather_bit_votes(
+    votes_per_block: np.ndarray,
+    permutation: np.ndarray,
+    payload_bits: int,
+    repetition: int,
+) -> np.ndarray:
+    """Total votes for each payload bit, summed over its repeated copies."""
+    indices = permutation[: repetition * payload_bits].reshape(repetition, payload_bits)
+    return votes_per_block[indices].sum(axis=0)
 
 
 def extract_signature(
@@ -156,23 +195,12 @@ def _extract_watermark_bundle_from_array(
 
     active_coefficient_layouts = coefficient_layouts or WATERMARK_EXTRACT_COEFFICIENT_LAYOUTS
     for coefficient_pairs in active_coefficient_layouts:
+        votes_per_block, votes_per_pair = _votes_per_block(luminance, coefficient_pairs)
+        total_votes = votes_per_pair * repetition
         for permutation in permutations:
             try:
-                recovered_bits = np.zeros(payload_bits, dtype=np.uint8)
-                for bit_index in range(payload_bits):
-                    votes = 0
-                    total_votes = 0
-                    for repetition_index in range(repetition):
-                        block_index = permutation[repetition_index * payload_bits + bit_index]
-                        row, col = block_coordinates(block_index, blocks_per_row)
-                        block = luminance[row : row + BLOCK_SIZE, col : col + BLOCK_SIZE]
-                        block_votes, block_vote_count = _extract_bit_votes_from_block(
-                            block,
-                            coefficient_pairs,
-                        )
-                        votes += block_votes
-                        total_votes += block_vote_count
-                    recovered_bits[bit_index] = 1 if votes > (total_votes / 2.0) else 0
+                votes = _gather_bit_votes(votes_per_block, permutation, payload_bits, repetition)
+                recovered_bits = (votes > (total_votes / 2.0)).astype(np.uint8)
 
                 payload = bits_to_bytes(recovered_bits.tolist())
                 fingerprint, signature = parse_watermark_payload(payload)
@@ -237,32 +265,21 @@ def watermark_payload_correlation(
     best_signed_margin = 0.0
     active_coefficient_layouts = coefficient_layouts or WATERMARK_EXTRACT_COEFFICIENT_LAYOUTS
     for coefficient_pairs in active_coefficient_layouts:
+        votes_per_block, votes_per_pair = _votes_per_block(luminance, coefficient_pairs)
+        total_votes = votes_per_pair * repetition
+        half_votes = total_votes / 2.0
         for permutation in permutations:
-            matching_bits = 0
-            signed_margin_sum = 0.0
-            compared_bits = 0
-            for bit_index in range(start, end):
-                expected_bit = expected_bits[bit_index]
-                votes = 0
-                total_votes = 0
-                for repetition_index in range(repetition):
-                    block_index = permutation[repetition_index * payload_bits + bit_index]
-                    row, col = block_coordinates(block_index, blocks_per_row)
-                    block = luminance[row : row + BLOCK_SIZE, col : col + BLOCK_SIZE]
-                    block_votes, block_vote_count = _extract_bit_votes_from_block(
-                        block,
-                        coefficient_pairs,
-                    )
-                    votes += block_votes
-                    total_votes += block_vote_count
-                recovered_bit = 1 if votes > (total_votes / 2.0) else 0
-                matching_bits += int(recovered_bit == int(expected_bit))
-                raw_margin = (votes - (total_votes / 2.0)) / (total_votes / 2.0)
-                signed_margin_sum += raw_margin if int(expected_bit) == 1 else -raw_margin
-                compared_bits += 1
+            votes = _gather_bit_votes(votes_per_block, permutation, payload_bits, repetition)[start:end]
+            wanted = expected_bits[start:end].astype(np.int32)
 
-            agreement = matching_bits / float(compared_bits)
-            signed_margin = signed_margin_sum / float(compared_bits)
+            recovered = (votes > half_votes).astype(np.int32)
+            agreement = float(np.count_nonzero(recovered == wanted)) / float(end - start)
+
+            raw_margin = (votes - half_votes) / half_votes
+            # A bit expected to be 1 should lean positive and a 0 negative, so
+            # flip the sign on zero bits before averaging.
+            signed_margin = float(np.mean(np.where(wanted == 1, raw_margin, -raw_margin)))
+
             if (agreement, signed_margin) > (best_agreement, best_signed_margin):
                 best_agreement = agreement
                 best_signed_margin = signed_margin

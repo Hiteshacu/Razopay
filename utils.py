@@ -731,6 +731,34 @@ def crop_to_block_grid(image: np.ndarray, block_size: int = BLOCK_SIZE) -> np.nd
     return image[:usable_height, :usable_width].copy()
 
 
+def _dct_matrix(size: int = BLOCK_SIZE) -> np.ndarray:
+    """Orthonormal DCT-II matrix, so that dct2(X) equals D @ X @ D.T."""
+    frequencies = np.arange(size).reshape(-1, 1)
+    positions = np.arange(size).reshape(1, -1)
+    matrix = np.cos(np.pi * (2 * positions + 1) * frequencies / (2 * size)) * np.sqrt(2.0 / size)
+    matrix[0] = np.sqrt(1.0 / size)
+    return matrix.astype(np.float32)
+
+
+DCT_MATRIX = _dct_matrix()
+
+
+def image_to_blocks(luminance: np.ndarray) -> np.ndarray:
+    """Reshape a luminance plane into a (rows, cols, 8, 8) stack of blocks."""
+    height, width = luminance.shape
+    return (
+        luminance.reshape(height // BLOCK_SIZE, BLOCK_SIZE, width // BLOCK_SIZE, BLOCK_SIZE)
+        .transpose(0, 2, 1, 3)
+        .copy()
+    )
+
+
+def blocks_to_image(blocks: np.ndarray) -> np.ndarray:
+    """Inverse of image_to_blocks."""
+    rows, cols = blocks.shape[:2]
+    return blocks.transpose(0, 2, 1, 3).reshape(rows * BLOCK_SIZE, cols * BLOCK_SIZE)
+
+
 def canonicalize_image_for_hash(image: np.ndarray) -> np.ndarray:
     """
     Remove the watermark carrier coefficients before hashing.
@@ -739,30 +767,30 @@ def canonicalize_image_for_hash(image: np.ndarray) -> np.ndarray:
     By neutralizing every DCT coefficient pair reserved for watermark carriers
     in every 8x8 luminance block, the signer and verifier hash the same
     canonical visual content instead of two slightly different pixel layouts.
+
+    Every block is transformed in one batched matrix product rather than a
+    per-block call. A megapixel image holds around 17,000 blocks, and crossing
+    into OpenCV once per block dominated the cost of every fingerprint. The
+    transform is identical, so fingerprints are unchanged.
     """
     working_image = crop_to_block_grid(image)
     ycrcb = cv2.cvtColor(working_image, cv2.COLOR_BGR2YCrCb)
     luminance = ycrcb[:, :, 0].astype(np.float32)
 
-    for row in range(0, luminance.shape[0], BLOCK_SIZE):
-        for col in range(0, luminance.shape[1], BLOCK_SIZE):
-            block = luminance[row : row + BLOCK_SIZE, col : col + BLOCK_SIZE]
-            dct_block = cv2.dct(block - 128.0)
+    blocks = image_to_blocks(luminance)
+    blocks -= 128.0
+    coefficients = DCT_MATRIX @ blocks @ DCT_MATRIX.T
 
-            for (a_row, a_col), (b_row, b_col) in WATERMARK_EMBED_COEFFICIENT_PAIRS:
-                neutral_value = (
-                    float(dct_block[a_row, a_col]) + float(dct_block[b_row, b_col])
-                ) / 2.0
-                dct_block[a_row, a_col] = neutral_value
-                dct_block[b_row, b_col] = neutral_value
+    for (a_row, a_col), (b_row, b_col) in WATERMARK_EMBED_COEFFICIENT_PAIRS:
+        neutral_value = (
+            coefficients[..., a_row, a_col] + coefficients[..., b_row, b_col]
+        ) / 2.0
+        coefficients[..., a_row, a_col] = neutral_value
+        coefficients[..., b_row, b_col] = neutral_value
 
-            luminance[row : row + BLOCK_SIZE, col : col + BLOCK_SIZE] = np.clip(
-                cv2.idct(dct_block) + 128.0,
-                0,
-                255,
-            )
+    restored = np.clip(DCT_MATRIX.T @ coefficients @ DCT_MATRIX + 128.0, 0, 255)
 
-    ycrcb[:, :, 0] = luminance.astype(np.uint8)
+    ycrcb[:, :, 0] = blocks_to_image(restored).astype(np.uint8)
     return cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2BGR)
 
 
