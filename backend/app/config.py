@@ -52,6 +52,17 @@ class Settings:
     master_key: str = os.getenv("MASTER_KEY", "")
     admin_username: str = os.getenv("ADMIN_USERNAME", "admin")
     admin_password: str = os.getenv("ADMIN_PASSWORD", "admin123")
+    # Turn on once Firebase Auth is configured and a first admin has signed
+    # in. While false, the admin endpoints stay open — do not leave it that
+    # way on a public deployment.
+    require_admin_auth: bool = _env_bool("REQUIRE_ADMIN_AUTH", False)
+    # Seed accounts: these emails are approved the first time they sign in,
+    # so the first operator does not need an existing admin to let them in.
+    admin_emails: tuple[str, ...] = tuple(
+        email.strip().lower()
+        for email in os.getenv("ADMIN_EMAILS", "").split(",")
+        if email.strip()
+    )
     cors_origins: tuple[str, ...] = tuple(
         origin.strip()
         for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")

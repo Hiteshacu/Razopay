@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+from ..security import require_admin
 
 from ..services.signing_service import SigningService
 
@@ -13,6 +15,7 @@ async def sign_document(
     file: UploadFile = File(...),
     authority_id: str = Form(...),
     key_id: str = Form(...),
+    admin: dict = Depends(require_admin),
 ):
     try:
         return await SigningService().sign_upload(file, authority_id, key_id)

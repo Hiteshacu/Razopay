@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from ..security import require_admin
 
 from ..schemas import KeyGenerateRequest
 from ..services.key_service import KeyService
@@ -10,7 +12,7 @@ router = APIRouter(prefix="/api/keys", tags=["keys"])
 
 
 @router.post("/generate")
-def generate_key_pair(payload: KeyGenerateRequest):
+def generate_key_pair(payload: KeyGenerateRequest, admin: dict = Depends(require_admin)):
     try:
         return KeyService().generate_key_pair(payload.authority_id, payload.authority_name)
     except Exception as exc:

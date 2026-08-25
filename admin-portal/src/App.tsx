@@ -1,18 +1,37 @@
 import { useEffect, useState } from "react";
-import { AuditLog, Authority, PublicKey, SignedDocument, wakeService } from "./api/client";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import {
+  AuditLog,
+  Authority,
+  PublicKey,
+  SignedDocument,
+  apiClient,
+  wakeService
+} from "./api/client";
 import { listAuditLogs, listDocuments } from "./api/documents";
 import { listAuthorities, listPublicKeys } from "./api/keys";
 import { Navbar, View } from "./components/Navbar";
+import { firebaseAuth, firebaseConfigured } from "./firebase";
 import { AuditLogs } from "./pages/AuditLogs";
+import { AuthPage, type AuthMode } from "./pages/AuthPage";
 import { Authorities } from "./pages/Authorities";
 import { Dashboard } from "./pages/Dashboard";
 import { KeyManagement } from "./pages/KeyManagement";
-import { Login } from "./pages/Login";
+import { Landing } from "./pages/Landing";
 import { SignDocument } from "./pages/SignDocument";
 import { SignedDocuments } from "./pages/SignedDocuments";
 
+type Screen = "landing" | "auth" | "console";
+
+type Approval = { approved: boolean; email: string | null; reason?: string } | null;
+
 export default function App() {
-  const [authenticated, setAuthenticated] = useState(Boolean(localStorage.getItem("dts_admin_token")));
+  const [screen, setScreen] = useState<Screen>("landing");
+  const [authMode, setAuthMode] = useState<AuthMode>("signin");
+  const [user, setUser] = useState<User | null>(null);
+  const [approval, setApproval] = useState<Approval>(null);
+  const [checkingSession, setCheckingSession] = useState(firebaseConfigured);
+
   const [view, setView] = useState<View>("dashboard");
   const [authorities, setAuthorities] = useState<Authority[]>([]);
   const [keys, setKeys] = useState<PublicKey[]>([]);
@@ -20,6 +39,57 @@ export default function App() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Start waking the service as the page opens, so the spin-up overlaps with
+  // reading the landing page rather than running after sign-in.
+  useEffect(() => {
+    wakeService();
+  }, []);
+
+  // Firebase restores an existing session asynchronously, so wait for its
+  // first callback before deciding which screen to show. Rendering the
+  // landing page first would sign the operator out visually on every reload.
+  useEffect(() => {
+    const auth = firebaseAuth();
+    if (!auth) {
+      setCheckingSession(false);
+      return;
+    }
+    return onAuthStateChanged(auth, (nextUser) => {
+      setUser(nextUser);
+      setCheckingSession(false);
+      if (!nextUser) {
+        setApproval(null);
+        setScreen("landing");
+      }
+    });
+  }, []);
+
+  // Signing in proves who someone is; it does not make them an authority.
+  // Ask the backend whether this account is approved before showing the
+  // console, so an unapproved operator gets an explanation instead of a
+  // screen full of failed requests.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const { data } = await apiClient.get("/api/auth/me");
+        if (cancelled) return;
+        setApproval({ approved: Boolean(data.approved), email: data.email, reason: data.reason });
+        if (data.approved) setScreen("console");
+      } catch {
+        if (!cancelled) {
+          setApproval({ approved: false, email: user.email, reason: "unreachable" });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   async function loadAll() {
     const [authorityData, keyData, documentData, auditData] = await Promise.all([
@@ -56,28 +126,103 @@ export default function App() {
     }
   }
 
-  // Start waking the service as the page opens, before anyone signs in, so the
-  // spin-up runs while the login screen is on show rather than afterwards.
   useEffect(() => {
-    wakeService();
-  }, []);
-
-  useEffect(() => {
-    if (authenticated) {
+    if (screen === "console") {
       void refresh();
     }
-  }, [authenticated]);
+  }, [screen]);
 
-  if (!authenticated) {
-    return <Login onLogin={() => setAuthenticated(true)} />;
+  async function handleSignOut() {
+    const auth = firebaseAuth();
+    if (auth) await signOut(auth);
+    setUser(null);
+    setApproval(null);
+    setScreen("landing");
+  }
+
+  if (checkingSession) {
+    return (
+      <main className="login-shell">
+        <section className="login-panel">
+          <p className="loading-note">Checking your session...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!user) {
+    if (screen === "auth") {
+      return (
+        <AuthPage mode={authMode} onModeChange={setAuthMode} onBack={() => setScreen("landing")} />
+      );
+    }
+    return (
+      <Landing
+        onSignIn={() => {
+          setAuthMode("signin");
+          setScreen("auth");
+        }}
+        onSignUp={() => {
+          setAuthMode("signup");
+          setScreen("auth");
+        }}
+      />
+    );
+  }
+
+  if (approval && !approval.approved) {
+    const unreachable = approval.reason === "unreachable";
+    return (
+      <main className="login-shell">
+        <section className="login-panel">
+          <p className="eyebrow">Digital Trust Shield</p>
+          <h1>{unreachable ? "Cannot reach the service" : "Account awaiting approval"}</h1>
+          <p className="loading-note">
+            {unreachable
+              ? "Signed in as " +
+                (approval.email ?? "this account") +
+                ", but the Trust Shield service did not respond. It may still be waking up — wait a moment and try again."
+              : "Signed in as " +
+                (approval.email ?? "this account") +
+                ". Creating an account does not grant authority to sign documents. An existing administrator needs to approve this account first."}
+          </p>
+          <button className="primary-button" onClick={() => window.location.reload()}>
+            Try again
+          </button>
+          <p className="auth-switch">
+            <button type="button" onClick={handleSignOut}>
+              Sign out
+            </button>
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!approval) {
+    return (
+      <main className="login-shell">
+        <section className="login-panel">
+          <p className="loading-note">Checking your access...</p>
+        </section>
+      </main>
+    );
   }
 
   return (
     <main className="app-shell">
-      <Navbar view={view} onChange={setView} />
+      <Navbar view={view} onChange={setView} email={approval.email} onSignOut={handleSignOut} />
       <section className="workspace">
         {loadError && <div className="status-banner">{loadError}</div>}
-        {view === "dashboard" && <Dashboard authorities={authorities} keys={keys} documents={documents} auditLogs={auditLogs} loading={loading} />}
+        {view === "dashboard" && (
+          <Dashboard
+            authorities={authorities}
+            keys={keys}
+            documents={documents}
+            auditLogs={auditLogs}
+            loading={loading}
+          />
+        )}
         {view === "authorities" && <Authorities authorities={authorities} onChanged={refresh} />}
         {view === "keys" && <KeyManagement authorities={authorities} keys={keys} onChanged={refresh} />}
         {view === "sign" && <SignDocument authorities={authorities} keys={keys} onSigned={refresh} />}
@@ -87,4 +232,3 @@ export default function App() {
     </main>
   );
 }
-

@@ -82,6 +82,17 @@ services:
       - key: DTS_VERIFY_DEADLINE_SECONDS
         value: "35"
 
+      # Admin authentication. Leave false only while Firebase Auth is being
+      # set up and the first operator signs in — while it is false the signing
+      # and key-generation endpoints are open to anyone who finds the URL.
+      # Switch to true before this deployment is shown publicly.
+      - key: REQUIRE_ADMIN_AUTH
+        value: "false"
+      # Comma-separated emails approved automatically on first sign-in, so the
+      # first operator does not need an existing admin to let them in.
+      - key: ADMIN_EMAILS
+        sync: false
+
   # ---------------------------------------------------------------
   # Admin portal (free static hosting) + the judges' APK download page
   # ---------------------------------------------------------------
@@ -95,6 +106,17 @@ services:
     envVars:
       - key: VITE_API_BASE_URL
         value: https://trust-shield-api.onrender.com
+      # Firebase web config, read at build time. Not secrets — they identify
+      # the project and ship inside the bundle either way. Enter them once in
+      # the dashboard; access is enforced by the backend verifying ID tokens.
+      - key: VITE_FIREBASE_API_KEY
+        sync: false
+      - key: VITE_FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: VITE_FIREBASE_PROJECT_ID
+        sync: false
+      - key: VITE_FIREBASE_APP_ID
+        sync: false
     routes:
       # The APK landing page is plain HTML sitting in public/apk/. This rule
       # must come first: the SPA catch-all below would otherwise answer /apk

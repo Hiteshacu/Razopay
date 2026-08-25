@@ -12,7 +12,17 @@ const items: Array<{ id: View; label: string; icon: ComponentType<{ size?: numbe
   { id: "audit", label: "Audit", icon: ScrollText }
 ];
 
-export function Navbar({ view, onChange }: { view: View; onChange: (view: View) => void }) {
+export function Navbar({
+  view,
+  onChange,
+  email,
+  onSignOut
+}: {
+  view: View;
+  onChange: (view: View) => void;
+  email?: string | null;
+  onSignOut?: () => void;
+}) {
   return (
     <aside className="sidebar">
       <div className="brand-mark">DTS</div>
@@ -35,6 +45,17 @@ export function Navbar({ view, onChange }: { view: View; onChange: (view: View) 
           );
         })}
       </nav>
+      {email && (
+        <div className="signed-in-as">
+          <span>Signed in as</span>
+          <strong>{email}</strong>
+          {onSignOut && (
+            <button type="button" onClick={onSignOut}>
+              Sign out
+            </button>
+          )}
+        </div>
+      )}
       <p className="security-note">
         Private keys stay encrypted on the backend. Firebase stores public proof metadata only.
       </p>

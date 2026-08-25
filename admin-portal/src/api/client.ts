@@ -1,8 +1,24 @@
 import axios from "axios";
+import { firebaseAuth } from "../firebase";
 
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000",
   timeout: 120000
+});
+
+/**
+ * Attach the signed-in operator's Firebase ID token to every request.
+ *
+ * getIdToken() returns the cached token and refreshes it automatically when
+ * it is close to expiry, so a long session does not start failing an hour in.
+ */
+apiClient.interceptors.request.use(async (config) => {
+  const user = firebaseAuth()?.currentUser;
+  if (user) {
+    const token = await user.getIdToken();
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 /**
