@@ -63,6 +63,12 @@ def startup_checks():
             print(f"WARNING: Firestore registry backend not installed: {exc}")
 
 
+def _email_configured() -> bool:
+    from .services.email_service import EmailService
+
+    return EmailService().configured
+
+
 @app.get("/api/health")
 def health_check():
     try:
@@ -89,6 +95,13 @@ def health_check():
         "persistence": {
             "registry": settings.registry_backend,
             "private_keys": settings.key_store_backend,
+        },
+        "admin_auth": {
+            "required": settings.require_admin_auth,
+            # Whether approval emails can be sent at all — the difference
+            # between "not configured" and "configured but failing" is
+            # otherwise invisible from outside.
+            "approval_email": "configured" if _email_configured() else "not configured",
         },
         "chatbot": {
             "tavily": "configured" if settings.tavily_api_key else "missing",

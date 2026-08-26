@@ -97,39 +97,59 @@ def admin_status(identity: dict) -> dict:
         )
         return {**identity, "approved": True, "reason": "bootstrap"}
 
+    now = datetime.now(timezone.utc)
+
     if not record:
-        # First sight of this account: record the request and email an owner a
-        # link to act on it, so approval does not depend on someone noticing a
-        # row in a database.
-        request_token = secrets.token_urlsafe(32)
-        firebase.create_document(
-            ADMIN_COLLECTION,
-            uid,
-            {
-                "uid": uid,
-                "email": email,
-                "approved": False,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "approval_token": request_token,
-                "approval_token_expires": (
-                    datetime.now(timezone.utc) + timedelta(days=7)
-                ).isoformat(),
-            },
-        )
-        _notify_owner_of_request(email, request_token)
+        # First sight of this account: record the request so an owner can act
+        # on it, rather than approval depending on someone noticing a database
+        # row.
+        record = {
+            "uid": uid,
+            "email": email,
+            "approved": False,
+            "created_at": now.isoformat(),
+            "approval_token": secrets.token_urlsafe(32),
+            "approval_token_expires": (now + timedelta(days=7)).isoformat(),
+            "notification_sent": False,
+        }
+        firebase.create_document(ADMIN_COLLECTION, uid, record)
+
+    # Notify on every visit until one actually succeeds. Sending used to be
+    # attempted only when the record was created, so a request raised before
+    # SMTP was configured lost its notification permanently — adding the
+    # credentials afterwards could never recover it.
+    if not record.get("notification_sent") and _notification_cooldown_passed(record, now):
+        sent = _notify_owner_of_request(record.get("email"), str(record.get("approval_token") or ""))
+        record["notification_sent"] = sent
+        record["notification_attempted_at"] = now.isoformat()
+        firebase.create_document(ADMIN_COLLECTION, uid, record)
 
     return {**identity, "approved": False, "reason": "pending_approval"}
 
 
-def _notify_owner_of_request(requester_email: str | None, token: str) -> None:
+NOTIFICATION_RETRY_MINUTES = 5
+
+
+def _notification_cooldown_passed(record: dict, now: datetime) -> bool:
+    """Avoid retrying on every single request while SMTP stays broken."""
+    attempted = str(record.get("notification_attempted_at") or "")
+    if not attempted:
+        return True
+    try:
+        return now - datetime.fromisoformat(attempted) > timedelta(minutes=NOTIFICATION_RETRY_MINUTES)
+    except ValueError:
+        return True
+
+
+def _notify_owner_of_request(requester_email: str | None, token: str) -> bool:
     owner = settings.approval_notify_email or (
         settings.admin_emails[0] if settings.admin_emails else ""
     )
     if not owner:
         print("WARNING: no APPROVAL_NOTIFY_EMAIL or ADMIN_EMAILS set; approval request not sent")
-        return
+        return False
 
-    EmailService().send_approval_request(
+    return EmailService().send_approval_request(
         owner_email=owner,
         requester_email=requester_email or "an account with no email address",
         approve_url=f"{settings.portal_base_url}/?approve={token}",
