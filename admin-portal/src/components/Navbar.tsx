@@ -45,15 +45,16 @@ export function Navbar({
           );
         })}
       </nav>
-      {email && (
+      {onSignOut && (
+        // Shown whenever a sign-out is possible, not only when the address is
+        // known. With authentication disabled the backend reports no email,
+        // and gating the whole block on it left the console with no way out.
         <div className="signed-in-as">
-          <span>Signed in as</span>
-          <strong>{email}</strong>
-          {onSignOut && (
-            <button type="button" onClick={onSignOut}>
-              Sign out
-            </button>
-          )}
+          <span>{email ? "Signed in as" : "Signed in"}</span>
+          {email && <strong>{email}</strong>}
+          <button type="button" onClick={onSignOut}>
+            Sign out
+          </button>
         </div>
       )}
       <p className="security-note">

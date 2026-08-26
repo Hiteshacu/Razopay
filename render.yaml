@@ -82,12 +82,13 @@ services:
       - key: DTS_VERIFY_DEADLINE_SECONDS
         value: "35"
 
-      # Admin authentication. Leave false only while Firebase Auth is being
-      # set up and the first operator signs in — while it is false the signing
-      # and key-generation endpoints are open to anyone who finds the URL.
-      # Switch to true before this deployment is shown publicly.
+      # Admin authentication. This value wins on every blueprint sync, so it
+      # must hold the intended setting rather than a temporary one — changing
+      # it in the dashboard alone is silently undone the next time the
+      # blueprint applies. Setup is complete, so it stays on: with it off the
+      # signing and key-generation endpoints are open to anyone with the URL.
       - key: REQUIRE_ADMIN_AUTH
-        value: "false"
+        value: "true"
       # Comma-separated emails approved automatically on first sign-in, so the
       # first operator does not need an existing admin to let them in.
       - key: ADMIN_EMAILS
