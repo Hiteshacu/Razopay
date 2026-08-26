@@ -15,6 +15,7 @@ import { firebaseAuth, firebaseConfigured } from "./firebase";
 import { AuditLogs } from "./pages/AuditLogs";
 import { ApprovalPage } from "./pages/ApprovalPage";
 import { AuthPage, type AuthMode } from "./pages/AuthPage";
+import { Approvals } from "./pages/Approvals";
 import { Authorities } from "./pages/Authorities";
 import { Dashboard } from "./pages/Dashboard";
 import { KeyManagement } from "./pages/KeyManagement";
@@ -247,6 +248,7 @@ export default function App() {
         {view === "sign" && <SignDocument authorities={authorities} keys={keys} onSigned={refresh} />}
         {view === "documents" && <SignedDocuments documents={documents} />}
         {view === "audit" && <AuditLogs logs={auditLogs} />}
+        {view === "approvals" && <Approvals />}
       </section>
     </main>
   );

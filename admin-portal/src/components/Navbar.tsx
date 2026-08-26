@@ -1,7 +1,7 @@
-import { FileSignature, KeyRound, LayoutDashboard, ListChecks, ScrollText, ShieldCheck } from "lucide-react";
+import { FileSignature, KeyRound, LayoutDashboard, ListChecks, ScrollText, ShieldCheck, UserCheck } from "lucide-react";
 import type { ComponentType } from "react";
 
-type View = "dashboard" | "authorities" | "keys" | "sign" | "documents" | "audit";
+type View = "dashboard" | "authorities" | "keys" | "sign" | "documents" | "audit" | "approvals";
 
 const items: Array<{ id: View; label: string; icon: ComponentType<{ size?: number }> }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -9,7 +9,8 @@ const items: Array<{ id: View; label: string; icon: ComponentType<{ size?: numbe
   { id: "keys", label: "Keys", icon: KeyRound },
   { id: "sign", label: "Sign", icon: FileSignature },
   { id: "documents", label: "Documents", icon: ListChecks },
-  { id: "audit", label: "Audit", icon: ScrollText }
+  { id: "audit", label: "Audit", icon: ScrollText },
+  { id: "approvals", label: "Approvals", icon: UserCheck }
 ];
 
 export function Navbar({

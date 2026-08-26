@@ -6,7 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..config import settings
 from ..schemas import LoginRequest, LoginResponse
-from ..security import admin_status, approve_request, find_approval_request, verify_identity
+from ..security import (
+    admin_status,
+    approve_request,
+    delete_request,
+    find_approval_request,
+    list_pending_requests,
+    require_admin,
+    set_approval,
+    verify_identity,
+)
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -29,6 +38,35 @@ def current_admin(identity: dict = Depends(verify_identity)):
         "reason": record.get("reason"),
         "auth_required": settings.require_admin_auth,
     }
+
+
+@router.get("/pending")
+def list_pending(admin: dict = Depends(require_admin)):
+    """Accounts waiting to be approved.
+
+    Email cannot be relied on here: free hosting blocks outbound SMTP, so an
+    approval that only ever arrives by mail may never arrive at all. Listing
+    the queue in the console makes approval work regardless.
+    """
+    return list_pending_requests()
+
+
+@router.post("/pending/{uid}/approve")
+def approve_pending(uid: str, admin: dict = Depends(require_admin)):
+    try:
+        record = set_approval(uid, approved=True, actor=admin.get("email") or "console")
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"success": True, "email": record.get("email"), "message": f"{record.get('email')} can now sign documents."}
+
+
+@router.delete("/pending/{uid}")
+def reject_pending(uid: str, admin: dict = Depends(require_admin)):
+    try:
+        record = delete_request(uid)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"success": True, "email": record.get("email"), "message": f"Request from {record.get('email')} removed."}
 
 
 @router.get("/approval/{token}")

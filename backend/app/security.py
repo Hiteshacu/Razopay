@@ -156,6 +156,52 @@ def _notify_owner_of_request(requester_email: str | None, token: str) -> bool:
     )
 
 
+def list_pending_requests() -> list[dict]:
+    """Accounts that have signed in but are not approved yet."""
+    firebase = FirebaseService()
+    pending = [
+        {
+            "uid": record.get("uid"),
+            "email": record.get("email"),
+            "requested_at": record.get("created_at"),
+            "notified": bool(record.get("notification_sent")),
+        }
+        for record in firebase.list_collection(ADMIN_COLLECTION, limit=500)
+        if not record.get("approved")
+    ]
+    pending.sort(key=lambda item: str(item.get("requested_at") or ""), reverse=True)
+    return pending
+
+
+def set_approval(uid: str, *, approved: bool, actor: str) -> dict:
+    firebase = FirebaseService()
+    record = firebase.get_document(ADMIN_COLLECTION, uid)
+    if not record:
+        raise LookupError("That request no longer exists.")
+    record.update(
+        {
+            "approved": approved,
+            "approved_via": "console",
+            "approved_by": actor,
+            "approved_at": datetime.now(timezone.utc).isoformat(),
+            # Retire the emailed link once the decision is made here.
+            "approval_token": None,
+            "approval_token_expires": None,
+        }
+    )
+    firebase.create_document(ADMIN_COLLECTION, uid, record)
+    return record
+
+
+def delete_request(uid: str) -> dict:
+    firebase = FirebaseService()
+    record = firebase.get_document(ADMIN_COLLECTION, uid)
+    if not record:
+        raise LookupError("That request no longer exists.")
+    firebase.db.collection(ADMIN_COLLECTION).document(uid).delete()
+    return record
+
+
 def find_approval_request(token: str) -> dict | None:
     """Look up a pending request by its token, if it is still valid."""
     if not token:

@@ -526,3 +526,20 @@ th, td {
   margin: 4px 0 6px;
   text-align: left;
 }
+
+.approval-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 14px 0;
+}
+.approval-row strong { display: block; color: #0f172a; }
+.approval-row small { color: #64748b; }
+.approval-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.approval-ok {
+  background: #dcece9; color: #0b5a54;
+  border-radius: 9px; padding: 11px 14px; font-size: 0.92rem;
+}
