@@ -14,13 +14,15 @@ can get in without a chicken-and-egg problem.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, Header, HTTPException, status
 from firebase_admin import auth as firebase_auth
 
 from .config import settings
 from .firebase_client import get_firebase_app
+from .services.email_service import EmailService
 from .services.firebase_service import FirebaseService
 
 
@@ -96,8 +98,10 @@ def admin_status(identity: dict) -> dict:
         return {**identity, "approved": True, "reason": "bootstrap"}
 
     if not record:
-        # Remember the request so an existing admin can approve it later
-        # rather than the person having to ask out of band.
+        # First sight of this account: record the request and email an owner a
+        # link to act on it, so approval does not depend on someone noticing a
+        # row in a database.
+        request_token = secrets.token_urlsafe(32)
         firebase.create_document(
             ADMIN_COLLECTION,
             uid,
@@ -106,10 +110,74 @@ def admin_status(identity: dict) -> dict:
                 "email": email,
                 "approved": False,
                 "created_at": datetime.now(timezone.utc).isoformat(),
+                "approval_token": request_token,
+                "approval_token_expires": (
+                    datetime.now(timezone.utc) + timedelta(days=7)
+                ).isoformat(),
             },
         )
+        _notify_owner_of_request(email, request_token)
 
     return {**identity, "approved": False, "reason": "pending_approval"}
+
+
+def _notify_owner_of_request(requester_email: str | None, token: str) -> None:
+    owner = settings.approval_notify_email or (
+        settings.admin_emails[0] if settings.admin_emails else ""
+    )
+    if not owner:
+        print("WARNING: no APPROVAL_NOTIFY_EMAIL or ADMIN_EMAILS set; approval request not sent")
+        return
+
+    EmailService().send_approval_request(
+        owner_email=owner,
+        requester_email=requester_email or "an account with no email address",
+        approve_url=f"{settings.portal_base_url}/?approve={token}",
+    )
+
+
+def find_approval_request(token: str) -> dict | None:
+    """Look up a pending request by its token, if it is still valid."""
+    if not token:
+        return None
+    firebase = FirebaseService()
+    for record in firebase.list_collection(ADMIN_COLLECTION, limit=500):
+        if not secrets.compare_digest(str(record.get("approval_token") or ""), token):
+            continue
+        if record.get("approved"):
+            return {**record, "state": "already_approved"}
+        expires = str(record.get("approval_token_expires") or "")
+        try:
+            if expires and datetime.fromisoformat(expires) < datetime.now(timezone.utc):
+                return {**record, "state": "expired"}
+        except ValueError:
+            pass
+        return {**record, "state": "pending"}
+    return None
+
+
+def approve_request(token: str) -> dict:
+    """Grant authority to the account holding this token, once."""
+    record = find_approval_request(token)
+    if record is None:
+        raise LookupError("This approval link is not valid.")
+    if record.get("state") == "expired":
+        raise LookupError("This approval link has expired.")
+    if record.get("state") == "already_approved":
+        return {"email": record.get("email"), "already": True}
+
+    firebase = FirebaseService()
+    updated = {
+        **{k: v for k, v in record.items() if k != "state"},
+        "approved": True,
+        "approved_via": "email_link",
+        "approved_at": datetime.now(timezone.utc).isoformat(),
+        # Burn the token so the link cannot be replayed.
+        "approval_token": None,
+        "approval_token_expires": None,
+    }
+    firebase.create_document(ADMIN_COLLECTION, str(record["uid"]), updated)
+    return {"email": record.get("email"), "already": False}
 
 
 def require_admin(identity: dict = Depends(verify_identity)) -> dict:

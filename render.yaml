@@ -92,6 +92,25 @@ services:
       # first operator does not need an existing admin to let them in.
       - key: ADMIN_EMAILS
         sync: false
+      # Where approval requests are emailed. Defaults to the first ADMIN_EMAILS
+      # entry when unset.
+      - key: APPROVAL_NOTIFY_EMAIL
+        sync: false
+      # Origin used to build the link inside approval emails.
+      - key: PORTAL_BASE_URL
+        value: https://trust-shield-admin.onrender.com
+      # SMTP for approval emails. Leave unset and signups still work — the
+      # request is recorded and can be approved from the console instead.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
 
   # ---------------------------------------------------------------
   # Admin portal (free static hosting) + the judges' APK download page

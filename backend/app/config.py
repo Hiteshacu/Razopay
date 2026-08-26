@@ -63,6 +63,17 @@ class Settings:
         for email in os.getenv("ADMIN_EMAILS", "").split(",")
         if email.strip()
     )
+    # Where approval requests are sent. Falls back to the first seed admin.
+    approval_notify_email: str = os.getenv("APPROVAL_NOTIFY_EMAIL", "").strip()
+    # Origin of the portal, used to build the link in the approval email.
+    portal_base_url: str = os.getenv("PORTAL_BASE_URL", "http://localhost:5173").rstrip("/")
+
+    # --- SMTP: leave unset to disable approval emails entirely ---
+    smtp_host: str = os.getenv("SMTP_HOST", "").strip()
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username: str = os.getenv("SMTP_USERNAME", "").strip()
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_from: str = os.getenv("SMTP_FROM", "").strip()
     cors_origins: tuple[str, ...] = tuple(
         origin.strip()
         for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")

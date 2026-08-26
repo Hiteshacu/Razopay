@@ -515,3 +515,14 @@ th, td {
   }
 }
 
+
+.approval-warning {
+  background: #f6ecd4;
+  color: #6b5210;
+  border-radius: 9px;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin: 4px 0 6px;
+  text-align: left;
+}

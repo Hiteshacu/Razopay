@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..config import settings
 from ..schemas import LoginRequest, LoginResponse
-from ..security import admin_status, verify_identity
+from ..security import admin_status, approve_request, find_approval_request, verify_identity
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -28,6 +28,43 @@ def current_admin(identity: dict = Depends(verify_identity)):
         "approved": record["approved"],
         "reason": record.get("reason"),
         "auth_required": settings.require_admin_auth,
+    }
+
+
+@router.get("/approval/{token}")
+def read_approval_request(token: str):
+    """Describe a pending request so the page can show who it is for.
+
+    Deliberately read-only. Mail clients and link scanners fetch URLs in
+    messages before a person ever clicks, so approving on a GET would let an
+    unopened email grant access by itself. Approval happens on the POST below.
+    """
+    record = find_approval_request(token)
+    if record is None:
+        raise HTTPException(status_code=404, detail="This approval link is not valid.")
+    return {
+        "email": record.get("email"),
+        "requested_at": record.get("created_at"),
+        "state": record.get("state"),
+    }
+
+
+@router.post("/approval/{token}")
+def approve_from_email(token: str):
+    """Grant authority to the account named by this token."""
+    try:
+        result = approve_request(token)
+    except LookupError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "success": True,
+        "email": result["email"],
+        "already_approved": result["already"],
+        "message": (
+            f"{result['email']} was already approved."
+            if result["already"]
+            else f"{result['email']} can now sign documents."
+        ),
     }
 
 

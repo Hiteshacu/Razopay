@@ -13,6 +13,7 @@ import { listAuthorities, listPublicKeys } from "./api/keys";
 import { Navbar, View } from "./components/Navbar";
 import { firebaseAuth, firebaseConfigured } from "./firebase";
 import { AuditLogs } from "./pages/AuditLogs";
+import { ApprovalPage } from "./pages/ApprovalPage";
 import { AuthPage, type AuthMode } from "./pages/AuthPage";
 import { Authorities } from "./pages/Authorities";
 import { Dashboard } from "./pages/Dashboard";
@@ -31,6 +32,12 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [approval, setApproval] = useState<Approval>(null);
   const [checkingSession, setCheckingSession] = useState(firebaseConfigured);
+  // An approval link arrives as ?approve=<token>. It is handled before any
+  // sign-in check, because the person clicking it is usually not the person
+  // whose account is waiting.
+  const [approvalToken, setApprovalToken] = useState<string | null>(() =>
+    new URLSearchParams(window.location.search).get("approve")
+  );
 
   const [view, setView] = useState<View>("dashboard");
   const [authorities, setAuthorities] = useState<Authority[]>([]);
@@ -138,6 +145,18 @@ export default function App() {
     setUser(null);
     setApproval(null);
     setScreen("landing");
+  }
+
+  if (approvalToken) {
+    return (
+      <ApprovalPage
+        token={approvalToken}
+        onDone={() => {
+          window.history.replaceState({}, "", window.location.pathname);
+          setApprovalToken(null);
+        }}
+      />
+    );
   }
 
   if (checkingSession) {
