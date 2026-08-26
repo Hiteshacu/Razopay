@@ -68,7 +68,13 @@ class Settings:
     # Origin of the portal, used to build the link in the approval email.
     portal_base_url: str = os.getenv("PORTAL_BASE_URL", "http://localhost:5173").rstrip("/")
 
-    # --- SMTP: leave unset to disable approval emails entirely ---
+    # --- Mail API over HTTPS (preferred) ---
+    # Hosts commonly block the SMTP ports outright, so a mail API reached over
+    # 443 is the transport that works everywhere. Takes priority over SMTP.
+    resend_api_key: str = os.getenv("RESEND_API_KEY", "").strip()
+    resend_from: str = os.getenv("RESEND_FROM", "onboarding@resend.dev").strip()
+
+    # --- SMTP: fallback, only usable where the ports are open ---
     smtp_host: str = os.getenv("SMTP_HOST", "").strip()
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
     smtp_username: str = os.getenv("SMTP_USERNAME", "").strip()

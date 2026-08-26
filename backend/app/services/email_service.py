@@ -13,19 +13,69 @@ import ssl
 from email.message import EmailMessage
 from html import escape
 
+import httpx
+
 from ..config import settings
 
 
 class EmailService:
     @property
-    def configured(self) -> bool:
+    def smtp_configured(self) -> bool:
         return bool(settings.smtp_host and settings.smtp_username and settings.smtp_password)
 
+    @property
+    def http_configured(self) -> bool:
+        return bool(settings.resend_api_key)
+
+    @property
+    def configured(self) -> bool:
+        return self.http_configured or self.smtp_configured
+
+    @property
+    def transport(self) -> str:
+        if self.http_configured:
+            return "https"
+        if self.smtp_configured:
+            return "smtp"
+        return "none"
+
     def send(self, to: str, subject: str, text_body: str, html_body: str | None = None) -> bool:
-        if not self.configured:
-            print(f"WARNING: SMTP not configured, no email sent to {to} ({subject})")
+        # HTTPS first. Many hosts — Render's free tier among them — block
+        # outbound traffic to the SMTP ports entirely, so a mail API over 443
+        # is the only route that works there.
+        if self.http_configured:
+            return self._send_over_https(to, subject, text_body, html_body)
+        if self.smtp_configured:
+            return self._send_over_smtp(to, subject, text_body, html_body)
+        print(f"WARNING: no email transport configured, nothing sent to {to} ({subject})")
+        return False
+
+    def _send_over_https(self, to: str, subject: str, text_body: str, html_body: str | None) -> bool:
+        payload = {
+            "from": settings.resend_from or "onboarding@resend.dev",
+            "to": [to],
+            "subject": subject,
+            "text": text_body,
+        }
+        if html_body:
+            payload["html"] = html_body
+
+        try:
+            response = httpx.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+                json=payload,
+                timeout=20.0,
+            )
+            if response.status_code >= 400:
+                print(f"WARNING: mail API rejected the message to {to}: {response.status_code} {response.text[:200]}")
+                return False
+            return True
+        except Exception as exc:
+            print(f"WARNING: could not reach the mail API for {to}: {exc}")
             return False
 
+    def _send_over_smtp(self, to: str, subject: str, text_body: str, html_body: str | None) -> bool:
         message = EmailMessage()
         message["Subject"] = subject
         message["From"] = settings.smtp_from or settings.smtp_username

@@ -157,8 +157,23 @@ def _notify_owner_of_request(requester_email: str | None, token: str) -> bool:
 
 
 def list_pending_requests() -> list[dict]:
-    """Accounts that have signed in but are not approved yet."""
+    """Accounts that have signed in but are not approved yet.
+
+    Records for accounts that no longer exist are dropped. Deleting a user in
+    the Firebase console leaves their request behind, and a queue showing
+    people who cannot sign in is worse than no queue.
+    """
     firebase = FirebaseService()
+    try:
+        get_firebase_app()
+        live_uids = set()
+        page = firebase_auth.list_users()
+        while page:
+            live_uids.update(user.uid for user in page.users)
+            page = page.get_next_page()
+    except Exception:
+        live_uids = None  # cannot check; show everything rather than hide it
+
     pending = [
         {
             "uid": record.get("uid"),
@@ -168,6 +183,7 @@ def list_pending_requests() -> list[dict]:
         }
         for record in firebase.list_collection(ADMIN_COLLECTION, limit=500)
         if not record.get("approved")
+        and (live_uids is None or str(record.get("uid")) in live_uids)
     ]
     pending.sort(key=lambda item: str(item.get("requested_at") or ""), reverse=True)
     return pending

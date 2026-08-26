@@ -63,10 +63,10 @@ def startup_checks():
             print(f"WARNING: Firestore registry backend not installed: {exc}")
 
 
-def _email_configured() -> bool:
+def _email_transport() -> str:
     from .services.email_service import EmailService
 
-    return EmailService().configured
+    return EmailService().transport
 
 
 @app.get("/api/health")
@@ -101,7 +101,9 @@ def health_check():
             # Whether approval emails can be sent at all — the difference
             # between "not configured" and "configured but failing" is
             # otherwise invisible from outside.
-            "approval_email": "configured" if _email_configured() else "not configured",
+            # "smtp" is blocked outright on some hosts, so naming the
+            # transport says more than a yes/no.
+            "approval_email": _email_transport(),
         },
         "chatbot": {
             "tavily": "configured" if settings.tavily_api_key else "missing",

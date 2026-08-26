@@ -100,8 +100,15 @@ services:
       # Origin used to build the link inside approval emails.
       - key: PORTAL_BASE_URL
         value: https://trust-shield-admin.onrender.com
-      # SMTP for approval emails. Leave unset and signups still work — the
-      # request is recorded and can be approved from the console instead.
+      # Approval email over HTTPS. Preferred, and the only transport that
+      # works here: this host blocks outbound traffic to the SMTP ports.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        value: onboarding@resend.dev
+
+      # SMTP fallback, for a host where the ports are open. Leave unset and
+      # signups still work — requests can always be approved from the console.
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
@@ -137,6 +144,17 @@ services:
         sync: false
       - key: VITE_FIREBASE_APP_ID
         sync: false
+    headers:
+      # Asset filenames are content-hashed and safe to cache forever, but
+      # index.html names them. Letting it be cached serves the previous
+      # build's bundle after a deploy — which showed up as new navigation
+      # missing until a manual reload.
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache, must-revalidate
+      - path: /
+        name: Cache-Control
+        value: no-cache, must-revalidate
     routes:
       # The APK landing page is plain HTML sitting in public/apk/. This rule
       # must come first: the SPA catch-all below would otherwise answer /apk
