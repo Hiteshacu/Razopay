@@ -42,7 +42,13 @@ class SigningService:
     def _local_download_url(self, signed_filename: str) -> str:
         return f"{settings.public_base_url}/uploads/signed_documents/{signed_filename}"
 
-    async def sign_upload(self, file: UploadFile, authority_id: str, key_id: str) -> dict:
+    async def sign_upload(
+        self,
+        file: UploadFile,
+        authority_id: str,
+        key_id: str,
+        signed_by: dict | None = None,
+    ) -> dict:
         authority = self.firebase.get_document("authorities", authority_id)
         if not authority:
             raise ValueError(f"Authority not found: {authority_id}")
@@ -113,6 +119,10 @@ class SigningService:
                 "created_at": utc_now(),
                 "signature_status": "signed",
                 "status": "SIGNED",
+                # Who signed it, so an administrator can see every account's
+                # work and a member can be shown only their own.
+                "signed_by_uid": (signed_by or {}).get("uid"),
+                "signed_by_email": (signed_by or {}).get("email"),
                 "signing_mode": "invisible_watermark",
                 "notes": "Signed by Digital Trust Shield FastAPI backend.",
             }

@@ -543,3 +543,17 @@ th, td {
   background: #dcece9; color: #0b5a54;
   border-radius: 9px; padding: 11px 14px; font-size: 0.92rem;
 }
+
+.role-pill {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.role-owner { background: #0f766e; color: #ffffff; }
+.role-admin { background: #dcece9; color: #0b5a54; }
+.role-member { background: #e2e8f0; color: #475569; }
+.signed-in-as .role-pill { align-self: flex-start; margin-top: 4px; }

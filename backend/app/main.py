@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import ensure_local_storage_dirs, settings
 from .firebase_client import get_firestore_client, get_storage_bucket
-from .routes import audit, auth, authorities, chat, documents, keys, signing, verification
+from .routes import admin, audit, auth, authorities, chat, documents, keys, signing, verification
 
 
 app = FastAPI(
@@ -33,6 +33,7 @@ app.include_router(verification.router)
 app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(audit.router)
+app.include_router(admin.router)
 
 
 @app.on_event("startup")

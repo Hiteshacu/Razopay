@@ -89,8 +89,12 @@ services:
       # signing and key-generation endpoints are open to anyone with the URL.
       - key: REQUIRE_ADMIN_AUTH
         value: "true"
-      # Comma-separated emails approved automatically on first sign-in, so the
-      # first operator does not need an existing admin to let them in.
+      # The single account that always administers the system. Approved on
+      # sight, cannot be demoted, and receives approval requests.
+      - key: OWNER_EMAIL
+        sync: false
+      # Additional addresses approved on first sign-in as administrators.
+      # Optional once the owner is set.
       - key: ADMIN_EMAILS
         sync: false
       # Where approval requests are emailed. Defaults to the first ADMIN_EMAILS

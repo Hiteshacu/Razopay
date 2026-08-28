@@ -63,7 +63,10 @@ class Settings:
         for email in os.getenv("ADMIN_EMAILS", "").split(",")
         if email.strip()
     )
-    # Where approval requests are sent. Falls back to the first seed admin.
+    # The one account that always administers the system. It is approved on
+    # sight, cannot be demoted, and is where approval requests are sent.
+    owner_email: str = os.getenv("OWNER_EMAIL", "").strip().lower()
+    # Where approval requests are sent. Falls back to the owner.
     approval_notify_email: str = os.getenv("APPROVAL_NOTIFY_EMAIL", "").strip()
     # Origin of the portal, used to build the link in the approval email.
     portal_base_url: str = os.getenv("PORTAL_BASE_URL", "http://localhost:5173").rstrip("/")

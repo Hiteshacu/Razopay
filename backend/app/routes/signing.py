@@ -18,7 +18,7 @@ async def sign_document(
     admin: dict = Depends(require_admin),
 ):
     try:
-        return await SigningService().sign_upload(file, authority_id, key_id)
+        return await SigningService().sign_upload(file, authority_id, key_id, signed_by=admin)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -10,7 +10,7 @@ import {
 } from "./api/client";
 import { listAuditLogs, listDocuments } from "./api/documents";
 import { listAuthorities, listPublicKeys } from "./api/keys";
-import { Navbar, View } from "./components/Navbar";
+import { Navbar, type Role, View } from "./components/Navbar";
 import { firebaseAuth, firebaseConfigured } from "./firebase";
 import { AuditLogs } from "./pages/AuditLogs";
 import { ApprovalPage } from "./pages/ApprovalPage";
@@ -22,10 +22,11 @@ import { KeyManagement } from "./pages/KeyManagement";
 import { Landing } from "./pages/Landing";
 import { SignDocument } from "./pages/SignDocument";
 import { SignedDocuments } from "./pages/SignedDocuments";
+import { Users } from "./pages/Users";
 
 type Screen = "landing" | "auth" | "console";
 
-type Approval = { approved: boolean; email: string | null; reason?: string } | null;
+type Approval = { approved: boolean; email: string | null; reason?: string; role: Role } | null;
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("landing");
@@ -85,11 +86,16 @@ export default function App() {
       try {
         const { data } = await apiClient.get("/api/auth/me");
         if (cancelled) return;
-        setApproval({ approved: Boolean(data.approved), email: data.email, reason: data.reason });
+        setApproval({
+          approved: Boolean(data.approved),
+          email: data.email,
+          reason: data.reason,
+          role: (data.role as Role) ?? "member"
+        });
         if (data.approved) setScreen("console");
       } catch {
         if (!cancelled) {
-          setApproval({ approved: false, email: user.email, reason: "unreachable" });
+          setApproval({ approved: false, email: user.email, reason: "unreachable", role: "member" });
         }
       }
     })();
@@ -229,6 +235,8 @@ export default function App() {
     );
   }
 
+  const administers = approval.role === "owner" || approval.role === "admin";
+
   return (
     <main className="app-shell">
       <Navbar view={view} onChange={setView} email={approval.email} onSignOut={handleSignOut} />
@@ -248,7 +256,11 @@ export default function App() {
         {view === "sign" && <SignDocument authorities={authorities} keys={keys} onSigned={refresh} />}
         {view === "documents" && <SignedDocuments documents={documents} />}
         {view === "audit" && <AuditLogs logs={auditLogs} />}
-        {view === "approvals" && <Approvals />}
+        {/* Guarded here as well as in the sidebar: hiding a link is a
+            courtesy, not a control. The backend refuses these calls from a
+            member regardless. */}
+        {view === "approvals" && administers && <Approvals />}
+        {view === "users" && administers && <Users isOwner={approval.role === "owner"} />}
       </section>
     </main>
   );

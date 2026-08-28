@@ -1,29 +1,36 @@
-import { FileSignature, KeyRound, LayoutDashboard, ListChecks, ScrollText, ShieldCheck, UserCheck } from "lucide-react";
+import { FileSignature, KeyRound, LayoutDashboard, ListChecks, ScrollText, ShieldCheck, UserCheck, Users2 } from "lucide-react";
 import type { ComponentType } from "react";
 
-type View = "dashboard" | "authorities" | "keys" | "sign" | "documents" | "audit" | "approvals";
+type View = "dashboard" | "authorities" | "keys" | "sign" | "documents" | "audit" | "approvals" | "users";
 
-const items: Array<{ id: View; label: string; icon: ComponentType<{ size?: number }> }> = [
+type Role = "owner" | "admin" | "member";
+
+const items: Array<{ id: View; label: string; icon: ComponentType<{ size?: number }>; adminOnly?: boolean }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "authorities", label: "Authorities", icon: ShieldCheck },
   { id: "keys", label: "Keys", icon: KeyRound },
   { id: "sign", label: "Sign", icon: FileSignature },
   { id: "documents", label: "Documents", icon: ListChecks },
   { id: "audit", label: "Audit", icon: ScrollText },
-  { id: "approvals", label: "Approvals", icon: UserCheck }
+  { id: "approvals", label: "Approvals", icon: UserCheck, adminOnly: true },
+  { id: "users", label: "People", icon: Users2, adminOnly: true }
 ];
 
 export function Navbar({
   view,
   onChange,
   email,
+  role = "member",
   onSignOut
 }: {
   view: View;
   onChange: (view: View) => void;
   email?: string | null;
+  role?: Role;
   onSignOut?: () => void;
 }) {
+  const administers = role === "owner" || role === "admin";
+  const visible = items.filter((item) => !item.adminOnly || administers);
   return (
     <aside className="sidebar">
       <div className="brand-mark">DTS</div>
@@ -32,7 +39,7 @@ export function Navbar({
         <h1>Authority Console</h1>
       </div>
       <nav>
-        {items.map((item) => {
+        {visible.map((item) => {
           const Icon = item.icon;
           return (
             <button
@@ -53,6 +60,7 @@ export function Navbar({
         <div className="signed-in-as">
           <span>{email ? "Signed in as" : "Signed in"}</span>
           {email && <strong>{email}</strong>}
+          <span className={`role-pill role-${role}`}>{role}</span>
           <button type="button" onClick={onSignOut}>
             Sign out
           </button>
@@ -65,4 +73,4 @@ export function Navbar({
   );
 }
 
-export type { View };
+export type { View, Role };
