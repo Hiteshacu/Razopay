@@ -72,6 +72,25 @@ def _email_transport() -> str:
     return EmailService().transport
 
 
+@app.get("/api/ping")
+def ping():
+    """Cheapest possible proof that the process is running.
+
+    Exists for the keep-alive schedule. A free instance sleeps after fifteen
+    minutes without traffic and takes about a minute to wake, so something has
+    to knock on the door regularly — but /api/health is the wrong door to
+    knock on that often. It reaches Firestore on every call, which spends
+    quota a hundred and forty times a day for nothing, and it reports a
+    failure when a dependency is degraded even though the service is up. An
+    uptime monitor pointed at it would page about a subsystem rather than
+    about the thing it is supposed to watch.
+
+    This touches nothing and cannot fail while the process is alive, which is
+    exactly the question a keep-alive is asking.
+    """
+    return {"status": "awake"}
+
+
 @app.get("/api/health")
 def health_check():
     try:
