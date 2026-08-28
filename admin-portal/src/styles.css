@@ -781,6 +781,20 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   display: grid; gap: var(--space-5);
 }
 
+/* A grid or flex item will not shrink below its content by default, so one
+   long line inside a code block pushes the whole column wider than the
+   screen. The page hides that overflow, which means the content is silently
+   clipped rather than visibly broken — the worse of the two failures. Every
+   link in the chain from the page down to the code block has to be allowed
+   to shrink for the block's own horizontal scrollbar to be the thing that
+   gives way. */
+.library-inner > *,
+.library-page .panel,
+.step,
+.step-body,
+.snippet,
+.step-out { min-width: 0; }
+
 .library-hero { display: grid; gap: var(--space-3); padding-bottom: var(--space-2); }
 
 .library-title {
@@ -904,6 +918,75 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
 .survives li.no  .mark { color: #a52020; }
 .survives .what { color: var(--ink); font-weight: 500; }
 .survives .why { grid-column: 2; font-size: var(--t-sm); color: var(--ink-3); }
+
+/* A numbered walkthrough. The rail is a real line, not decoration: it says
+   these steps are one sequence and the order matters, which it does — the
+   restart has to sit between the install and the import. */
+.rail-label {
+  font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
+  font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-3);
+  margin: var(--space-5) 0 var(--space-2) !important;
+}
+.rail-label:first-of-type { margin-top: var(--space-3) !important; }
+
+.steps-list { list-style: none; margin: 0; padding: 0; }
+
+.step { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: var(--space-4); }
+.step:last-child .step-rail::after { display: none; }
+
+.step-rail { position: relative; display: flex; justify-content: center; }
+.step-rail::after {
+  content: ""; position: absolute; top: 34px; bottom: -6px; left: 50%;
+  width: 1px; background: var(--line); transform: translateX(-50%);
+}
+.step-n {
+  position: relative; z-index: 1;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
+  font-size: 12px; font-weight: 600;
+  color: var(--accent); background: var(--accent-wash);
+  border: 1px solid var(--accent-line, rgba(15, 118, 110, 0.3));
+}
+
+.step-body { padding-bottom: var(--space-5); min-width: 0; }
+.step-body h3 {
+  margin: 3px 0 6px; font-size: var(--t-md); font-weight: 700; color: var(--ink);
+}
+.step-note { margin: 0 0 var(--space-2); font-size: var(--t-sm); color: var(--ink-3); line-height: 1.6; max-width: 62ch; }
+.step-note code { font-size: 0.9em; }
+
+/* A step that is an action in the interface, not a command to run. */
+.step-action {
+  display: inline-block; margin: 0 0 var(--space-2);
+  font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
+  font-size: var(--t-sm); font-weight: 600; color: var(--ink);
+  background: var(--surface-sunk); border: 1px dashed var(--line);
+  border-radius: var(--r-sm); padding: 8px 14px;
+}
+
+.step-out {
+  margin-top: -4px; border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm); overflow: hidden; background: var(--surface-sunk);
+}
+.step-out > span {
+  display: block; padding: 5px 12px;
+  font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-3); border-bottom: 1px solid var(--line-soft);
+}
+.step-out pre {
+  margin: 0; padding: 10px 12px; overflow-x: auto;
+  font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
+  font-size: 12px; line-height: 1.6; color: var(--accent);
+}
+
+@media (max-width: 620px) {
+  .step { grid-template-columns: 26px minmax(0, 1fr); gap: var(--space-3); }
+  .step-n { width: 24px; height: 24px; font-size: 11px; }
+  .step-rail::after { top: 28px; }
+}
 
 .download-button.sm {
   display: inline-flex; align-items: center; gap: 8px;

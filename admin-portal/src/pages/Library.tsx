@@ -13,8 +13,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { EASE_OUT } from "../motion";
 
 const WHEEL = "/lib/trustshield-0.2.0-py3-none-any.whl";
-const INSTALL =
-  'pip install "git+https://github.com/Hiteshacu/trust-shield.git#subdirectory=library"';
+const GIT_URL = "git+https://github.com/Hiteshacu/trust-shield.git#subdirectory=library";
 
 /** Copyable code, with the language on the rail and a copy button that confirms itself. */
 function Snippet({ label = "python", code }: { label?: string; code: string }) {
@@ -139,6 +138,54 @@ function Section({
   );
 }
 
+
+/**
+ * One numbered step of the walkthrough.
+ *
+ * Numbered because this genuinely is a sequence — the install has to precede
+ * the restart, the restart has to precede the import, and a key has to exist
+ * before anything can be signed. Every step that produces output shows what
+ * that output should be, so a reader can tell whether they are still on track
+ * without running the next one to find out.
+ */
+function Step({
+  n,
+  title,
+  note,
+  label,
+  code,
+  output,
+  action
+}: {
+  n: string;
+  title: string;
+  note?: ReactNode;
+  label?: string;
+  code?: string;
+  output?: string;
+  action?: string;
+}) {
+  return (
+    <li className="step">
+      <div className="step-rail" aria-hidden="true">
+        <span className="step-n">{n}</span>
+      </div>
+      <div className="step-body">
+        <h3>{title}</h3>
+        {note && <p className="step-note">{note}</p>}
+        {action && <p className="step-action">{action}</p>}
+        {code && <Snippet label={label} code={code} />}
+        {output && (
+          <div className="step-out">
+            <span>you should see</span>
+            <pre>{output}</pre>
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
 const STATUSES: Array<[string, string, string]> = [
   ["AUTHENTIC", "Signed by that key, and unchanged since.", "ok"],
   ["TAMPERED", "Genuinely signed — and edited afterwards.", "warn"],
@@ -219,58 +266,152 @@ export function Library({ onBack }: { onBack: () => void }) {
           </motion.div>
         </motion.div>
 
-        <Section title="Install">
+        <Section title="Start to finish, in order" icon={<Terminal size={17} aria-hidden="true" />}>
           <p>
-            Not on PyPI yet, so install straight from the repository. This is the command
-            to use — <code>pip install trustshield</code> will not find it.
+            Every command, in the order they have to run. The first four are
+            one-time setup; from step 5 on is the work.
           </p>
-          <Snippet label="bash" code={INSTALL} />
-          <p className="hint">
-            Python 3.10 or newer. In a notebook, prefix with <code>!</code> and{" "}
-            <strong>restart the kernel afterwards</strong> — Python keeps the old module
-            in memory until you do.
-          </p>
-          <Snippet
-            label="jupyter"
-            code={`!pip install --no-cache-dir "git+https://github.com/Hiteshacu/trust-shield.git#subdirectory=library"
-# then: Kernel -> Restart Kernel`}
-          />
-        </Section>
 
-        <Section title="The whole thing, in five lines">
-          <Snippet
-            code={`import trustshield
+          <p className="rail-label">In a notebook</p>
+          <ol className="steps-list">
+            <Step
+              n="1"
+              title="Remove any older copy"
+              note={
+                <>
+                  A half-updated install is the hardest failure to read, because the
+                  version can report new while the code is old. Removing first makes
+                  that impossible.
+                </>
+              }
+              label="jupyter"
+              code="!pip uninstall -y trustshield"
+              output="Successfully uninstalled trustshield-0.2.0"
+            />
+            <Step
+              n="2"
+              title="Install"
+              label="jupyter"
+              code={`!pip install --no-cache-dir --force-reinstall --no-deps "${GIT_URL}"`}
+              output="Successfully installed trustshield-0.2.0"
+            />
+            <Step
+              n="3"
+              title="Restart the kernel"
+              action="Kernel → Restart Kernel"
+              note={
+                <>
+                  <strong>Not optional.</strong> Python keeps the old module in memory
+                  until you restart, so without this you get the previous version&rsquo;s
+                  errors no matter what pip just did.
+                </>
+              }
+            />
+            <Step
+              n="4"
+              title="Check what you actually have"
+              note="Checks the code, not just the version label — those can disagree."
+              code={`import trustshield, inspect
+from trustshield import api
 
-keys = trustshield.KeyPair.generate().save("./keys")
-trustshield.sign("notice.png", "signed.png", private_key="./keys")
-
-print(trustshield.verify("signed.png", public_key="./keys"))
-# AUTHENTIC: Signature valid and content unchanged.`}
-          />
-          <p className="hint">
-            Signing a 12-megapixel page takes about ten seconds. It will look like
-            nothing is happening. It is.
-          </p>
-        </Section>
-
-        <Section title="Running it more than once" icon={<Terminal size={17} aria-hidden="true" />}>
-          <p>
-            Keys are generated <strong>once</strong> and reused. Regenerating on every run
-            would sign each document with a different key, and nothing signed earlier
-            would verify. So a script that may run twice should load first:
-          </p>
-          <Snippet
-            code={`import trustshield
+src = inspect.getsource(api)
+print("version:", trustshield.__version__)
+print("has the fix:", "_signing_failure_message" in src)`}
+              output={`version: 0.2.0
+has the fix: True`}
+            />
+            <Step
+              n="5"
+              title="Make a key pair, or load the one you have"
+              note="Keys are made once and reused. Regenerating would sign every document with a different key, and nothing signed earlier would verify."
+              code={`import trustshield
 from pathlib import Path
 
 if Path("./keys/private_key.pem").exists():
     keys = trustshield.KeyPair.load("./keys")
 else:
-    keys = trustshield.KeyPair.generate().save("./keys")`}
+    keys = trustshield.KeyPair.generate().save("./keys")
+
+print("key", keys.fingerprint[:16])`}
+              output="key 7ca83b0c1cc2fac6"
+            />
+            <Step
+              n="6"
+              title="Sign a document"
+              note={
+                <>
+                  Use raw strings (<code>r&quot;...&quot;</code>) for Windows paths —
+                  <code> \U</code> in <code>C:\Users</code> is an escape sequence
+                  otherwise. Takes about ten seconds on a large page.
+                </>
+              }
+              code={`result = trustshield.sign(
+    r"C:\Users\HP\Pictures\research papers sih.png",
+    r"C:\Users\HP\Pictures\signed.png",
+    private_key="./keys",
+)
+print("signed ->", result.output_path)`}
+              output="signed -> C:\Users\HP\Pictures\signed.png"
+            />
+            <Step
+              n="7"
+              title="Verify the signed file"
+              code={`check = trustshield.verify(
+    r"C:\Users\HP\Pictures\signed.png", public_key="./keys"
+)
+print("verify ->", check.status)`}
+              output="verify -> AUTHENTIC"
+            />
+            <Step
+              n="8"
+              title="Verify the original, to prove it is not just saying yes"
+              note="The single most convincing thing to show anyone. The same command on the unsigned file has to come back negative, or the positive means nothing."
+              code={`check = trustshield.verify(
+    r"C:\Users\HP\Pictures\research papers sih.png", public_key="./keys"
+)
+print("verify ->", check.status)`}
+              output="verify -> WATERMARK_NOT_FOUND"
+            />
+          </ol>
+        </Section>
+
+        <Section title="The same thing outside a notebook">
+          <p>
+            No <code>!</code> prefix, and no kernel to restart. Otherwise identical.
+          </p>
+          <p className="rail-label">Terminal</p>
+          <Snippet
+            label="bash"
+            code={`pip install "${GIT_URL}"
+
+trustshield keygen -o ./keys
+trustshield sign notice.png -o signed.png -k ./keys
+trustshield verify signed.png -k ./keys      # AUTHENTIC, exit 0
+trustshield verify notice.png -k ./keys      # WATERMARK_NOT_FOUND, exit 1`}
+          />
+          <p className="rail-label">A Python script</p>
+          <Snippet
+            label="python"
+            code={`import trustshield
+from pathlib import Path
+
+keys = (
+    trustshield.KeyPair.load("./keys")
+    if Path("./keys/private_key.pem").exists()
+    else trustshield.KeyPair.generate().save("./keys")
+)
+
+trustshield.sign("notice.png", "signed.png", private_key="./keys")
+
+print(trustshield.verify("signed.png", public_key="./keys"))
+# AUTHENTIC: Signature valid and content unchanged.
+
+print(trustshield.verify("notice.png", public_key="./keys"))
+# WATERMARK_NOT_FOUND: No hidden proof was found in this image.`}
           />
           <p className="hint">
-            <code>save()</code> refuses to overwrite an existing pair rather than quietly
-            destroying your ability to verify past documents.
+            Signing a 12-megapixel page takes about ten seconds. It will look like
+            nothing is happening. It is.
           </p>
         </Section>
 
