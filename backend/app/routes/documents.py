@@ -12,17 +12,20 @@ from ..services.firebase_service import FirebaseService
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
-def _visible_to(document: dict, caller: dict) -> bool:
-    """Whether this caller is allowed to see this document at all.
+def _signed_by(document: dict, caller: dict) -> bool:
+    return bool(document.get("signed_by_uid")) and document.get("signed_by_uid") == caller.get("uid")
 
-    The owner sees everything on the system. Everyone else — administrators
-    included — sees only what they signed themselves, so one authority's work
-    is never exposed to another. Promoting somebody to administrator lets
-    them approve accounts; it does not open the archive to them.
+
+def _may_download(document: dict, caller: dict) -> bool:
+    """Whether this caller may fetch this file.
+
+    Wider than what the Documents tab lists: the owner may download any
+    document, because the whole point of an account's page under People is
+    to open the work it holds. Everyone else is held to their own.
     """
     if can_see_all_records(caller.get("role", "member")):
         return True
-    return bool(document.get("signed_by_uid")) and document.get("signed_by_uid") == caller.get("uid")
+    return _signed_by(document, caller)
 
 
 @router.get("")
@@ -30,9 +33,15 @@ def list_documents(
     authority_id: str | None = Query(default=None),
     admin: dict = Depends(require_admin),
 ):
-    """Signed documents visible to the caller."""
+    """The caller's own signed documents.
+
+    Own only, for every account including the owner. The owner used to see
+    every account's documents in this one list, which made it impossible to
+    tell at a glance which were theirs. Another account's documents are
+    reached through that account's page under People.
+    """
     documents = FirebaseService().list_signed_documents(authority_id=authority_id)
-    return [document for document in documents if _visible_to(document, admin)]
+    return [document for document in documents if _signed_by(document, admin)]
 
 
 @router.get("/{document_id}/file")
@@ -49,7 +58,7 @@ def download_document(document_id: str, admin: dict = Depends(require_admin)):
     authorities' documents by guessing.
     """
     document = FirebaseService().get_document("signed_documents", document_id)
-    if not document or not _visible_to(document, admin):
+    if not document or not _may_download(document, admin):
         raise HTTPException(status_code=404, detail="No such document.")
 
     key = document.get("signed_file_storage_path")

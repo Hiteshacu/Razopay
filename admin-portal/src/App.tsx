@@ -24,6 +24,7 @@ import { KeyManagement } from "./pages/KeyManagement";
 import { Landing } from "./pages/Landing";
 import { SignDocument } from "./pages/SignDocument";
 import { SignedDocuments } from "./pages/SignedDocuments";
+import { MemberActivity } from "./pages/MemberActivity";
 import { Users } from "./pages/Users";
 
 type Screen = "landing" | "auth" | "console";
@@ -44,6 +45,9 @@ export default function App() {
   );
 
   const [view, setView] = useState<View>("dashboard");
+  // Which account's page is open, if any. Held here rather than in Users so
+  // that leaving People and coming back does not reopen somebody's page.
+  const [openMember, setOpenMember] = useState<string | null>(null);
   const [authorities, setAuthorities] = useState<Authority[]>([]);
   const [keys, setKeys] = useState<PublicKey[]>([]);
   const [documents, setDocuments] = useState<SignedDocument[]>([]);
@@ -243,7 +247,10 @@ export default function App() {
     <main className="app-shell">
       <Navbar
         view={view}
-        onChange={setView}
+        onChange={(next) => {
+          setOpenMember(null);
+          setView(next);
+        }}
         email={approval.email}
         role={approval.role}
         onSignOut={handleSignOut}
@@ -272,7 +279,15 @@ export default function App() {
             courtesy, not a control. The backend refuses these calls from a
             member regardless. */}
         {view === "approvals" && administers && <Approvals />}
-        {view === "users" && administers && <Users isOwner={approval.role === "owner"} />}
+        {view === "users" && administers && openMember === null && (
+          <Users
+            isOwner={approval.role === "owner"}
+            onOpenMember={(uid) => setOpenMember(uid)}
+          />
+        )}
+        {view === "users" && administers && openMember !== null && (
+          <MemberActivity uid={openMember} onBack={() => setOpenMember(null)} />
+        )}
           </motion.div>
         </AnimatePresence>
       </section>

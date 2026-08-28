@@ -12,6 +12,7 @@ from ..security import (
     require_owner,
     set_role,
 )
+from ..services.audit_service import logs_for_account
 from ..services.firebase_service import FirebaseService
 
 
@@ -96,4 +97,58 @@ def overview(admin: dict = Depends(require_administrator)):
             else []
         ),
         "documents_scope": "all" if sees_everything else "own",
+    }
+
+
+@router.get("/users/{uid}/activity")
+def user_activity(uid: str, owner: dict = Depends(require_owner)):
+    """Everything one account has done, on one page.
+
+    Owner only, and deliberately a separate request rather than a wider
+    version of the ordinary listings. Every other view in the console shows
+    you your own work; seeing somebody else's is a thing you ask for by
+    name, about one account at a time. That keeps "whose is this?" from
+    being a question you have to ask of every row you look at.
+
+    Public key material only. Private keys never leave the key store, and
+    nothing here would be improved by changing that.
+    """
+    firebase = FirebaseService()
+
+    account = next((user for user in list_all_users() if user["uid"] == uid), None)
+    if account is None:
+        raise HTTPException(status_code=404, detail="No such account.")
+
+    authorities = [
+        record
+        for record in firebase.list_collection("authorities")
+        if record.get("created_by_uid") == uid
+    ]
+    keys = [
+        {key: value for key, value in record.items() if key != "public_key_pem"}
+        for record in firebase.list_public_keys()
+        if record.get("created_by_uid") == uid
+    ]
+    documents = sorted(
+        (
+            record
+            for record in firebase.list_signed_documents()
+            if record.get("signed_by_uid") == uid
+        ),
+        key=lambda item: str(item.get("created_at") or ""),
+        reverse=True,
+    )
+    audit = logs_for_account(firebase.list_collection("audit_logs", limit=500), uid)
+
+    return {
+        "user": account,
+        "totals": {
+            "authorities": len(authorities),
+            "keys": len(keys),
+            "documents": len(documents),
+        },
+        "authorities": sorted(authorities, key=lambda item: str(item.get("created_at") or ""), reverse=True),
+        "keys": sorted(keys, key=lambda item: str(item.get("created_at") or ""), reverse=True),
+        "documents": documents,
+        "audit": audit,
     }

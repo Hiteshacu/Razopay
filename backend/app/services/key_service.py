@@ -8,7 +8,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from ..schemas import AuthorityCreate
-from ..security import can_see_all_records, username_for
+from ..security import username_for
 from .audit_service import AuditService
 from .firebase_service import FirebaseService
 from .private_key_store import PrivateKeyStore
@@ -59,22 +59,25 @@ class KeyService:
         }
         self.firebase.create_document("authorities", authority_id, data)
         self.audit.record("AUTHORITY_CREATED", actor=account_email or payload.email,
+                          actor_uid=(caller or {}).get("uid"),
                           authority_id=authority_id, details=data)
         return data
 
     @staticmethod
     def _belongs_to(record: dict, caller: dict | None) -> bool:
-        """Whether this account may use this authority or key.
+        """Whether this authority or key is this account's own.
 
-        The owner may use anything. Everyone else is held to what they
-        created, and a record with no creator belongs to nobody but the
-        owner rather than to whoever asks for it first.
+        Strict, with no exemption for the owner. The owner's own console
+        should show the owner's own work; mixing every account's authorities
+        into one list is what made it impossible to tell whose was whose.
+        Another account's records are reached through that account's page
+        under People, where you have said whose you want to see.
+
+        It also settles signing: you sign with your own authority, never
+        with somebody else's, whatever your role.
         """
-        caller = caller or {}
-        if can_see_all_records(caller.get("role", "member")):
-            return True
         created_by = record.get("created_by_uid")
-        return bool(created_by) and created_by == caller.get("uid")
+        return bool(created_by) and created_by == (caller or {}).get("uid")
 
     def list_authorities(self, caller: dict | None = None) -> list[dict]:
         """The authorities this account may use.
@@ -143,6 +146,8 @@ class KeyService:
         self.firebase.create_document("public_keys", key_id, data)
         self.audit.record(
             "KEY_PAIR_GENERATED",
+            actor=authority.get("created_by_email") or "system",
+            actor_uid=authority.get("created_by_uid"),
             authority_id=authority_id,
             key_id=key_id,
             details={

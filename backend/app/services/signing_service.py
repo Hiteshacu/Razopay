@@ -139,6 +139,8 @@ class SigningService:
             try:
                 self.audit.record(
                     "DOCUMENT_SIGNED",
+                    actor=(signed_by or {}).get("email") or "system",
+                    actor_uid=(signed_by or {}).get("uid"),
                     authority_id=authority_id,
                     key_id=key_id,
                     document_id=document_id,

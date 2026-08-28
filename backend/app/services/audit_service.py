@@ -28,6 +28,7 @@ class AuditService:
         event_type: str,
         *,
         actor: str = "system",
+        actor_uid: str | None = None,
         authority_id: str | None = None,
         key_id: str | None = None,
         document_id: str | None = None,
@@ -38,6 +39,10 @@ class AuditService:
         payload = {
             "event_type": event_type,
             "actor": actor,
+            # The account the event belongs to. `actor` is a display address
+            # and has been "system" for most events; this is what the audit
+            # view is filtered by, so it has to be the account id.
+            "actor_uid": actor_uid,
             "authority_id": authority_id,
             "key_id": key_id,
             "document_id": document_id,
@@ -51,3 +56,17 @@ class AuditService:
         self.firebase.add_auto_document("audit_logs", payload)
         return payload
 
+
+
+def logs_for_account(logs: list[dict[str, Any]], uid: str | None) -> list[dict[str, Any]]:
+    """The entries belonging to one account, newest first.
+
+    Entries written before events carried an account id have no actor_uid
+    and belong to nobody, so they are shown to nobody. Dropping them is the
+    safe direction: an unattributable entry shown to the wrong person cannot
+    be taken back.
+    """
+    if not uid:
+        return []
+    owned = [entry for entry in logs if entry.get("actor_uid") == uid]
+    return sorted(owned, key=lambda item: item.get("timestamp", ""), reverse=True)

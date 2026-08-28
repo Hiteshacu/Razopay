@@ -39,7 +39,13 @@ const ROLE_LABEL: Record<string, string> = {
  * grant themselves a replacement, which would make the distinction
  * meaningless.
  */
-export function Users({ isOwner }: { isOwner: boolean }) {
+export function Users({
+  isOwner,
+  onOpenMember
+}: {
+  isOwner: boolean;
+  onOpenMember: (uid: string) => void;
+}) {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [ownerEmail, setOwnerEmail] = useState("");
@@ -136,8 +142,16 @@ export function Users({ isOwner }: { isOwner: boolean }) {
               </thead>
               <tbody>
                 {users.map((user) => (
-                  <tr key={user.uid}>
-                    <td>{user.email ?? "—"}</td>
+                  <tr key={user.uid} className={isOwner ? "row-link" : undefined}>
+                    <td>
+                      {isOwner ? (
+                        <button className="text-link" onClick={() => onOpenMember(user.uid)}>
+                          {user.email ?? user.uid}
+                        </button>
+                      ) : (
+                        user.email ?? "—"
+                      )}
+                    </td>
                     <td>
                       <span className={`role-pill role-${user.role}`}>
                         {ROLE_LABEL[user.role] ?? user.role}
@@ -197,9 +211,19 @@ export function Users({ isOwner }: { isOwner: boolean }) {
                 </tr>
               </thead>
               <tbody>
-                {overview.by_signer.map((signer) => (
-                  <tr key={signer.email}>
-                    <td>{signer.email}</td>
+                {overview.by_signer.map((signer) => {
+                  const account = users.find((user) => user.email === signer.email);
+                  return (
+                  <tr key={signer.email} className={account ? "row-link" : undefined}>
+                    <td>
+                      {account ? (
+                        <button className="text-link" onClick={() => onOpenMember(account.uid)}>
+                          {signer.email}
+                        </button>
+                      ) : (
+                        signer.email
+                      )}
+                    </td>
                     <td>{signer.documents}</td>
                     <td>
                       {signer.last_signed
@@ -207,12 +231,14 @@ export function Users({ isOwner }: { isOwner: boolean }) {
                         : "—"}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
           <p className="loading-note" style={{ marginTop: 14 }}>
-            Documents signed before accounts were attributed appear as
+            Open an account to see its authorities, keys, documents and audit
+            trail. Documents signed before accounts were attributed appear as
             "unattributed".
           </p>
         </section>
