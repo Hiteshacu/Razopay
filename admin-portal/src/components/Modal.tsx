@@ -8,17 +8,22 @@ import { EASE_OUT } from "../motion";
  * Escape and the backdrop close it only when `dismissable` is set. Work that
  * cannot be cancelled — a signature already in flight — should not offer a
  * way out that does not actually stop it.
+ *
+ * `wide` gives the panel a landscape shape, for content that is laid out in
+ * two columns rather than read top to bottom.
  */
 export function Modal({
   open,
   onClose,
   dismissable = true,
+  wide = false,
   labelledBy,
   children
 }: {
   open: boolean;
   onClose?: () => void;
   dismissable?: boolean;
+  wide?: boolean;
   labelledBy?: string;
   children: ReactNode;
 }) {
@@ -54,7 +59,7 @@ export function Modal({
           onClick={dismissable ? onClose : undefined}
         >
           <motion.div
-            className="modal-panel"
+            className={wide ? "modal-panel wide" : "modal-panel"}
             role="dialog"
             aria-modal="true"
             aria-labelledby={labelledBy}

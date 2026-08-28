@@ -80,7 +80,13 @@ export function SignDocument({
           and it stops a second signature being started mid-flight.
           Not dismissable while running — the request cannot be cancelled,
           so offering a close button would be a lie. */}
-      <Modal open={busy || Boolean(result)} dismissable={Boolean(result)} onClose={() => setResult(null)} labelledBy="signing-heading">
+      <Modal
+        open={busy || Boolean(result)}
+        dismissable={Boolean(result)}
+        wide
+        onClose={() => setResult(null)}
+        labelledBy="signing-heading"
+      >
         <SigningProgress done={Boolean(result)} />
         {result && (
           <div className="modal-actions">

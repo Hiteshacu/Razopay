@@ -704,6 +704,8 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
   box-shadow: var(--shadow-lg);
 }
 
+.modal-panel.wide { width: min(900px, 100%); }
+
 .modal-actions {
   display: flex;
   flex-wrap: wrap;
@@ -715,20 +717,65 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
 }
 .modal-actions .download-button { margin: 0; }
 
-/* ===================== signing progress ===================== */
+/* ===================== signing dialog ===================== */
 
-.signing-progress { display: grid; gap: var(--space-4); }
+/* Landscape: the work on the left, the steps on the right. A tall column of
+   steps made the dialog scroll, which hid the very thing it exists to show.
 
-.signing-progress-title {
-  margin: 0;
-  font-weight: 800;
-  color: var(--ink);
-  font-size: var(--t-lg);
+   Every class here is namespaced. The bare `.stage` this block used to rely on
+   collided with the landing hero's `.stage`, and because the hero is defined
+   later in this file it won — turning each signing step into a 760px dark
+   panel. Shared, unqualified names like that are the collision waiting to
+   happen; these ones say what they belong to. */
+
+.signing {
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: stretch;
 }
 
-.signing-stages { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.signing-visual {
+  position: relative;
+  overflow: hidden;
+  min-height: 320px;
+  border-radius: var(--r-md);
+  background: radial-gradient(circle at 50% 45%, #12302f 0%, #0b1a1b 58%, #071112 100%);
+}
+.signing-visual .lattice-canvas { position: absolute; inset: 0; }
 
-.stage {
+.signing-visual-caption {
+  position: absolute;
+  left: var(--space-4); right: var(--space-4); bottom: var(--space-4);
+  margin: 0;
+  font-size: var(--t-xs);
+  line-height: 1.55;
+  color: rgba(184, 210, 205, 0.72);
+}
+
+/* Dims the lattice once there is a result, so the tick is what the eye lands
+   on rather than competing with the motion behind it. */
+.signing-visual-veil {
+  position: absolute; inset: 0;
+  background: rgba(7, 17, 18, 0.55);
+}
+
+.signing-seal { position: absolute; inset: 0; display: grid; place-items: center; }
+.signing-seal svg { width: 44%; max-width: 150px; height: auto; overflow: visible; }
+.signing-seal-ring { fill: rgba(45, 212, 191, 0.14); stroke: #5eead4; stroke-width: 3; }
+.signing-seal-tick {
+  fill: none; stroke: #5eead4; stroke-width: 6.5;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.signing-body { display: grid; align-content: start; gap: var(--space-4); }
+
+.signing-title { margin: 0; font-weight: 800; color: var(--ink); font-size: var(--t-lg); }
+.signing-title .signing-title-done { color: var(--accent); }
+
+.signing-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+
+.signing-step {
   display: flex;
   gap: var(--space-3);
   align-items: flex-start;
@@ -736,9 +783,9 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
   border-radius: var(--r-sm);
   transition: background 0.25s ease;
 }
-.stage.active { background: var(--accent-wash); }
+.signing-step.active { background: var(--accent-wash); }
 
-.stage-marker {
+.signing-step-marker {
   flex: 0 0 auto;
   width: 24px; height: 24px;
   border-radius: 50%;
@@ -748,18 +795,23 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
   color: var(--ink-3);
   margin-top: 1px;
 }
-.stage.active .stage-marker,
-.stage.complete .stage-marker { background: var(--accent); color: #ffffff; }
+.signing-step.active .signing-step-marker,
+.signing-step.complete .signing-step-marker { background: var(--accent); color: #ffffff; }
 
-.stage-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: block; }
+.signing-step-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: block; }
 
-.stage-text { display: grid; gap: 2px; min-width: 0; }
-.stage-text strong { color: var(--ink-3); font-weight: 700; font-size: var(--t-md); }
-.stage-text small { color: var(--ink-3); font-size: var(--t-sm); opacity: 0.85; }
-.stage.active .stage-text strong,
-.stage.complete .stage-text strong { color: var(--ink); }
+.signing-step-text { display: grid; gap: 2px; min-width: 0; }
+.signing-step-text strong { color: var(--ink-3); font-weight: 700; font-size: var(--t-md); }
+.signing-step-text small { color: var(--ink-3); font-size: var(--t-sm); opacity: 0.85; }
+.signing-step.active .signing-step-text strong,
+.signing-step.complete .signing-step-text strong { color: var(--ink); }
 
-.signing-note { margin: 0; font-size: var(--t-sm); color: var(--ink-3); max-width: 60ch; line-height: 1.6; }
+.signing-note { margin: 0; font-size: var(--t-sm); color: var(--ink-3); line-height: 1.6; }
+
+@media (max-width: 780px) {
+  .signing { grid-template-columns: 1fr; gap: var(--space-5); }
+  .signing-visual { min-height: 200px; }
+}
 
 /* ===================== landing ===================== */
 
