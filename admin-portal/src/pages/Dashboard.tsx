@@ -1,13 +1,33 @@
+import { motion, useReducedMotion } from "motion/react";
 import { AuditLog, Authority, PublicKey, SignedDocument } from "../api/client";
+import { EASE_OUT } from "../motion";
 
-function Metric({ value, label, loading }: { value: number; label: string; loading: boolean }) {
+function Metric({
+  value,
+  label,
+  loading,
+  index
+}: {
+  value: number;
+  label: string;
+  loading: boolean;
+  index: number;
+}) {
+  const reduceMotion = useReducedMotion();
   return (
-    <div className="metric">
+    <motion.div
+      className="metric"
+      initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      // 50ms apart: reads as a sequence without the last card arriving late.
+      transition={{ duration: 0.4, delay: index * 0.05, ease: EASE_OUT }}
+      whileHover={reduceMotion ? undefined : { y: -3 }}
+    >
       {/* A zero while data is still in flight reads as "nothing here" rather
           than "not counted yet", which is alarming on a first load. */}
       <span className={loading ? "metric-pending" : undefined}>{loading ? "–" : value}</span>
       <p>{label}</p>
-    </div>
+    </motion.div>
   );
 }
 
@@ -31,10 +51,10 @@ export function Dashboard({
         <h2>Trust operations dashboard</h2>
       </header>
       <div className="metric-grid">
-        <Metric value={authorities.length} label="Authorities" loading={loading} />
-        <Metric value={keys.length} label="Public keys" loading={loading} />
-        <Metric value={documents.length} label="Signed documents" loading={loading} />
-        <Metric value={auditLogs.length} label="Audit events" loading={loading} />
+        <Metric value={authorities.length} label="Authorities" loading={loading} index={0} />
+        <Metric value={keys.length} label="Public keys" loading={loading} index={1} />
+        <Metric value={documents.length} label="Signed documents" loading={loading} index={2} />
+        <Metric value={auditLogs.length} label="Audit events" loading={loading} index={3} />
       </div>
       <section className="panel">
         <h3>Recent signing events</h3>
@@ -48,10 +68,16 @@ export function Dashboard({
         ) : (
           <div className="timeline">
             {auditLogs.slice(0, 6).map((log, index) => (
-              <div key={`${log.current_hash}-${index}`} className="timeline-row">
+              <motion.div
+                key={`${log.current_hash}-${index}`}
+                className="timeline-row"
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.04, ease: EASE_OUT }}
+              >
                 <strong>{log.event_type}</strong>
                 <span>{new Date(log.timestamp).toLocaleString()}</span>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}

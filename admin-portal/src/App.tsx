@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { AnimatePresence, motion } from "motion/react";
 import {
   AuditLog,
   Authority,
@@ -12,6 +13,7 @@ import { listAuditLogs, listDocuments } from "./api/documents";
 import { listAuthorities, listPublicKeys } from "./api/keys";
 import { Navbar, type Role, View } from "./components/Navbar";
 import { firebaseAuth, firebaseConfigured } from "./firebase";
+import { pageTransition } from "./motion";
 import { AuditLogs } from "./pages/AuditLogs";
 import { ApprovalPage } from "./pages/ApprovalPage";
 import { AuthPage, type AuthMode } from "./pages/AuthPage";
@@ -242,6 +244,10 @@ export default function App() {
       <Navbar view={view} onChange={setView} email={approval.email} onSignOut={handleSignOut} />
       <section className="workspace">
         {loadError && <div className="status-banner">{loadError}</div>}
+        {/* Keyed on the view so switching pages crossfades rather than
+            snapping, which makes the console feel like one surface. */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={view} {...pageTransition}>
         {view === "dashboard" && (
           <Dashboard
             authorities={authorities}
@@ -261,6 +267,8 @@ export default function App() {
             member regardless. */}
         {view === "approvals" && administers && <Approvals />}
         {view === "users" && administers && <Users isOwner={approval.role === "owner"} />}
+          </motion.div>
+        </AnimatePresence>
       </section>
     </main>
   );

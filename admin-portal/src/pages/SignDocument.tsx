@@ -1,10 +1,13 @@
 import axios from "axios";
+import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { Authority, PublicKey, signedFileUrl } from "../api/client";
 import { signDocument } from "../api/signing";
 import { FileUploader } from "../components/FileUploader";
 import { KeySelector } from "../components/KeySelector";
 import { ResultCard } from "../components/ResultCard";
+import { SigningProgress } from "../components/SigningProgress";
+import { EASE_OUT, press } from "../motion";
 
 export function SignDocument({
   authorities,
@@ -60,12 +63,37 @@ export function SignDocument({
           }}
           onKey={setKeyId}
         />
-        <button className="primary-button" disabled={!file || !authorityId || !keyId || busy} onClick={submit}>
+        <motion.button
+          className="primary-button"
+          disabled={!file || !authorityId || !keyId || busy}
+          onClick={submit}
+          {...(busy ? {} : press)}
+        >
           {busy ? "Signing..." : "Sign document"}
-        </button>
+        </motion.button>
         {error && <p className="error-text">{error}</p>}
       </section>
+
+      <AnimatePresence>
+        {(busy || result) && (
+          <motion.section
+            key="progress"
+            className="panel"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.28, ease: EASE_OUT }}
+          >
+            <SigningProgress done={Boolean(result)} />
+          </motion.section>
+        )}
+      </AnimatePresence>
       {result && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: EASE_OUT }}
+        >
         <ResultCard title="Document signed successfully" tone="success">
           <p>Document ID: {result.document_id}</p>
           <p>Storage: {result.signed_file_storage_path}</p>
@@ -83,6 +111,7 @@ export function SignDocument({
             server temporarily, so download it now rather than relying on this link later.
           </p>
         </ResultCard>
+        </motion.div>
       )}
     </div>
   );

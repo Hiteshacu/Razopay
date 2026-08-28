@@ -557,3 +557,75 @@ th, td {
 .role-admin { background: #dcece9; color: #0b5a54; }
 .role-member { background: #e2e8f0; color: #475569; }
 .signed-in-as .role-pill { align-self: flex-start; margin-top: 4px; }
+
+/* ---------- signing progress ---------- */
+.signing-progress { display: grid; gap: 16px; }
+
+.signing-progress-title {
+  margin: 0;
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 1.05rem;
+}
+
+.signing-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.stage {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 11px 12px;
+  border-radius: 9px;
+  transition: background 0.25s ease;
+}
+
+.stage.active { background: #eef5f4; }
+
+.stage-marker {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #e2e8f0;
+  color: #94a3b8;
+  margin-top: 1px;
+}
+
+.stage.active .stage-marker { background: #0f766e; color: #ffffff; }
+.stage.complete .stage-marker { background: #0f766e; color: #ffffff; }
+
+.stage-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  display: block;
+}
+
+.stage-text { display: grid; gap: 2px; min-width: 0; }
+.stage-text strong { color: #64748b; font-weight: 700; font-size: 0.95rem; }
+.stage-text small { color: #94a3b8; font-size: 0.83rem; }
+
+.stage.active .stage-text strong,
+.stage.complete .stage-text strong { color: #0f172a; }
+.stage.active .stage-text small { color: #64748b; }
+
+.signing-note {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #64748b;
+  max-width: 60ch;
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage { transition: none; }
+}
