@@ -6,6 +6,7 @@ import { signDocument } from "../api/signing";
 import { FileUploader } from "../components/FileUploader";
 import { KeySelector } from "../components/KeySelector";
 import { ResultCard } from "../components/ResultCard";
+import { Modal } from "../components/Modal";
 import { SigningProgress } from "../components/SigningProgress";
 import { EASE_OUT, press } from "../motion";
 
@@ -74,20 +75,31 @@ export function SignDocument({
         {error && <p className="error-text">{error}</p>}
       </section>
 
-      <AnimatePresence>
-        {(busy || result) && (
-          <motion.section
-            key="progress"
-            className="panel"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.28, ease: EASE_OUT }}
-          >
-            <SigningProgress done={Boolean(result)} />
-          </motion.section>
+      {/* A dialog rather than a panel further down the page: the wait is
+          long enough that the work needs to be the only thing on screen,
+          and it stops a second signature being started mid-flight.
+          Not dismissable while running — the request cannot be cancelled,
+          so offering a close button would be a lie. */}
+      <Modal open={busy || Boolean(result)} dismissable={Boolean(result)} onClose={() => setResult(null)} labelledBy="signing-heading">
+        <SigningProgress done={Boolean(result)} />
+        {result && (
+          <div className="modal-actions">
+            <a
+              className="download-button"
+              href={signedFileUrl(result)}
+              download={result.signed_filename}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Download signed document
+            </a>
+            <button className="ghost-button" onClick={() => setResult(null)}>
+              Close
+            </button>
+          </div>
         )}
-      </AnimatePresence>
+      </Modal>
+
       {result && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}

@@ -12,7 +12,7 @@ from ..security import (
     delete_request,
     find_approval_request,
     list_pending_requests,
-    require_admin,
+    require_administrator,
     set_approval,
     verify_identity,
 )
@@ -46,7 +46,7 @@ def current_admin(response: Response, identity: dict = Depends(verify_identity))
 
 
 @router.get("/pending")
-def list_pending(admin: dict = Depends(require_admin)):
+def list_pending(admin: dict = Depends(require_administrator)):
     """Accounts waiting to be approved.
 
     Email cannot be relied on here: free hosting blocks outbound SMTP, so an
@@ -57,7 +57,7 @@ def list_pending(admin: dict = Depends(require_admin)):
 
 
 @router.post("/pending/{uid}/approve")
-def approve_pending(uid: str, admin: dict = Depends(require_admin)):
+def approve_pending(uid: str, admin: dict = Depends(require_administrator)):
     try:
         record = set_approval(uid, approved=True, actor=admin.get("email") or "console")
     except LookupError as exc:
@@ -66,7 +66,7 @@ def approve_pending(uid: str, admin: dict = Depends(require_admin)):
 
 
 @router.delete("/pending/{uid}")
-def reject_pending(uid: str, admin: dict = Depends(require_admin)):
+def reject_pending(uid: str, admin: dict = Depends(require_administrator)):
     try:
         record = delete_request(uid)
     except LookupError as exc:

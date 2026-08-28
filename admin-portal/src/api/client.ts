@@ -92,6 +92,8 @@ export type SignedDocument = {
   signed_filename?: string;
   file_type: string;
   visual_fingerprint_hash?: string;
+  signed_by_email?: string;
+  signed_by_uid?: string;
   storage_type?: string;
   download_url?: string;
   signed_file_download_url: string;
