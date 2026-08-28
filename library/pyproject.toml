@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trustshield"
-version = "0.1.0"
+version = "0.2.0"
 description = "Sign images so the proof survives a screenshot — an RSA signature written into the pixels, not the metadata."
 readme = "README.md"
 requires-python = ">=3.10"

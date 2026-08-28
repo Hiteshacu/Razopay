@@ -48,7 +48,7 @@ from .api import (  # noqa: E402  (must follow the DTS_DATA_DIR setup above)
 )
 from .keys import KeyPair, load_private_key, load_public_key  # noqa: E402
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "KeyPair",

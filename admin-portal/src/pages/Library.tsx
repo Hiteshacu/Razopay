@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { EASE_OUT } from "../motion";
 
-const WHEEL = "/lib/trustshield-0.1.0-py3-none-any.whl";
+const WHEEL = "/lib/trustshield-0.2.0-py3-none-any.whl";
 
 function Snippet({ label, code }: { label?: string; code: string }) {
   const [copied, setCopied] = useState(false);
