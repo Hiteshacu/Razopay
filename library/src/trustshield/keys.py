@@ -79,10 +79,17 @@ class KeyPair:
             existing = [p for p in (private_path, public_path) if p.exists()]
             if existing:
                 names = ", ".join(p.name for p in existing)
+                # Name the fix, not just the rule. Hitting this almost always
+                # means someone meant to reuse a key pair rather than make a
+                # new one — keys are generated once and kept.
+                where = str(directory)
                 raise FileExistsError(
-                    f"{names} already exists in {target}. Pass overwrite=True to "
-                    f"replace it — but anything signed with the old key will no "
-                    f"longer verify."
+                    f"{names} already exists in {target}.\n"
+                    f"To use the existing pair:  KeyPair.load({where!r})\n"
+                    f"To replace it:             "
+                    f"KeyPair.generate().save({where!r}, overwrite=True)\n"
+                    f"Replacing is destructive — anything signed with the old key "
+                    f"stops verifying."
                 )
 
         private_bytes = self.private_key.private_bytes(
