@@ -20,13 +20,16 @@ export function Navbar({
   view,
   onChange,
   email,
-  role = "member",
+  role,
   onSignOut
 }: {
   view: View;
   onChange: (view: View) => void;
   email?: string | null;
-  role?: Role;
+  // Required on purpose. This defaulted to "member", so when a caller forgot
+  // to pass it the sidebar quietly hid every administrator control and
+  // reported the wrong role — with nothing failing to point at the cause.
+  role: Role;
   onSignOut?: () => void;
 }) {
   const administers = role === "owner" || role === "admin";

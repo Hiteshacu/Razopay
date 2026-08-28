@@ -241,7 +241,13 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <Navbar view={view} onChange={setView} email={approval.email} onSignOut={handleSignOut} />
+      <Navbar
+        view={view}
+        onChange={setView}
+        email={approval.email}
+        role={approval.role}
+        onSignOut={handleSignOut}
+      />
       <section className="workspace">
         {loadError && <div className="status-banner">{loadError}</div>}
         {/* Keyed on the view so switching pages crossfades rather than
