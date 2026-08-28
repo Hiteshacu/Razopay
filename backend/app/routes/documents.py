@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from ..security import can_administer
+from ..security import can_see_all_documents
 from ..security import require_admin
 from ..services.document_store import DocumentNotFound, get_document_store
 from ..services.firebase_service import FirebaseService
@@ -15,11 +15,12 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 def _visible_to(document: dict, caller: dict) -> bool:
     """Whether this caller is allowed to see this document at all.
 
-    An administrator sees everything on the system. Everyone else sees only
-    what they signed themselves, so one authority's work is never exposed to
-    another.
+    The owner sees everything on the system. Everyone else — administrators
+    included — sees only what they signed themselves, so one authority's work
+    is never exposed to another. Promoting somebody to administrator lets
+    them approve accounts; it does not open the archive to them.
     """
-    if can_administer(caller.get("role", "member")):
+    if can_see_all_documents(caller.get("role", "member")):
         return True
     return bool(document.get("signed_by_uid")) and document.get("signed_by_uid") == caller.get("uid")
 

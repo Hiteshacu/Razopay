@@ -22,6 +22,7 @@ type Overview = {
     administrators: number;
   };
   by_signer: Signer[];
+  documents_scope?: "all" | "own";
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -108,7 +109,9 @@ export function Users({ isOwner }: { isOwner: boolean }) {
           </div>
           <div className="metric">
             <span><CountUp value={overview.totals.documents} /></span>
-            <p>Documents signed</p>
+            {/* Administrators are not shown other accounts' documents, so
+                labelling their own count as a system total would be a lie. */}
+            <p>{overview.documents_scope === "own" ? "Your documents" : "Documents signed"}</p>
           </div>
         </div>
       )}
@@ -176,8 +179,8 @@ export function Users({ isOwner }: { isOwner: boolean }) {
 
         <p className="loading-note" style={{ marginTop: 16 }}>
           {isOwner
-            ? `Administrators can approve accounts and see every document. Only the owner (${ownerEmail}) can change roles.`
-            : "Only the owner can change roles."}
+            ? `Administrators can approve accounts and change nothing else. Signed documents stay private to whoever signed them — only the owner (${ownerEmail}) sees every document, and only the owner can change roles.`
+            : "Administrators approve accounts. Documents stay private to whoever signed them, so this page does not show other accounts' work. Only the owner can change roles."}
         </p>
       </section>
 

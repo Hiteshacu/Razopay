@@ -70,8 +70,28 @@ def role_for(record: dict | None, email: str | None) -> str:
 
 
 def can_administer(role: str) -> bool:
-    """Whether this role may approve accounts and see everyone's documents."""
+    """Whether this role may approve accounts and manage people.
+
+    Note what this does NOT grant: reading other accounts' documents. See
+    can_see_all_documents.
+    """
     return role in (ROLE_OWNER, ROLE_ADMIN)
+
+
+def can_see_all_documents(role: str) -> bool:
+    """Whether this role may see documents it did not sign.
+
+    The owner alone — deliberately not every administrator. Administering
+    accounts and reading what other authorities have signed are different
+    powers, and conflating them means every promotion silently hands over
+    the archive too. A signed document is the signer's work; an
+    administrator's job is to decide who may hold an account, not to read
+    what they produced with it.
+
+    This is why it is a separate predicate rather than a call to
+    can_administer: the two rules have to be able to move apart.
+    """
+    return role == ROLE_OWNER
 
 
 def _bearer_token(authorization: str | None) -> str:

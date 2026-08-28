@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..security import (
     ROLE_ADMIN,
     ROLE_MEMBER,
+    can_see_all_documents,
     list_all_users,
     owner_email,
     require_administrator,
@@ -47,15 +48,28 @@ def change_role(uid: str, payload: dict, owner: dict = Depends(require_owner)):
 
 @router.get("/overview")
 def overview(admin: dict = Depends(require_administrator)):
-    """System-wide totals, and who signed what.
+    """Totals for the People page.
 
-    A member only ever sees their own work, so these figures exist to give
-    an administrator the view across every account rather than a per-account
-    slice of it.
+    The account figures are system-wide, because approving accounts is an
+    administrator's job and they need to see all of them.
+
+    The document figures are not. They are scoped to what the caller is
+    allowed to see, so an administrator who may not read another account's
+    documents cannot infer them from a count either — "12 documents signed"
+    when you signed 3 tells you plenty about the other 9.
     """
     firebase = FirebaseService()
-    documents = firebase.list_signed_documents()
     users = list_all_users()
+
+    sees_everything = can_see_all_documents(admin.get("role", ROLE_MEMBER))
+    documents = firebase.list_signed_documents()
+    if not sees_everything:
+        documents = [
+            document
+            for document in documents
+            if document.get("signed_by_uid")
+            and document.get("signed_by_uid") == admin.get("uid")
+        ]
 
     by_signer: dict[str, dict] = {}
     for document in documents:
@@ -74,5 +88,12 @@ def overview(admin: dict = Depends(require_administrator)):
             "pending_users": sum(1 for user in users if not user["approved"]),
             "administrators": sum(1 for user in users if user["role"] in ("owner", "admin")),
         },
-        "by_signer": sorted(by_signer.values(), key=lambda item: -item["documents"]),
+        # Only the owner gets the per-account breakdown; for anyone else it
+        # would be a list of one, which is just their own total again.
+        "by_signer": (
+            sorted(by_signer.values(), key=lambda item: -item["documents"])
+            if sees_everything
+            else []
+        ),
+        "documents_scope": "all" if sees_everything else "own",
     }
