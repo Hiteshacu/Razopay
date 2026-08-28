@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from ..config import settings
 from ..schemas import LoginRequest, LoginResponse
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.get("/me")
-def current_admin(identity: dict = Depends(verify_identity)):
+def current_admin(response: Response, identity: dict = Depends(verify_identity)):
     """Who the caller is, and whether they may act as an authority.
 
     The portal calls this straight after sign-in so it can tell an approved
@@ -30,12 +30,17 @@ def current_admin(identity: dict = Depends(verify_identity)):
     and show the right screen instead of a wall of failed requests.
     """
     record = admin_status(identity)
+    # Never cached. A role can change between one request and the next, and a
+    # stale copy leaves someone looking at privileges they no longer hold —
+    # or, as happened here, not seeing ones they were just granted.
+    response.headers["Cache-Control"] = "no-store"
     return {
         "authenticated": True,
         "uid": record.get("uid"),
         "email": record.get("email"),
         "approved": record["approved"],
         "reason": record.get("reason"),
+        "role": record.get("role"),
         "auth_required": settings.require_admin_auth,
     }
 
