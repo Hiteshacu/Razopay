@@ -1,6 +1,7 @@
 import { FileSignature, ScanLine, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { SealAnimation } from "../components/SealAnimation";
+import { LatticeScene } from "../components/LatticeScene";
+import { EASE_OUT } from "../motion";
 
 const FEATURES = [
   {
@@ -29,94 +30,96 @@ export function Landing({
 }) {
   const reduceMotion = useReducedMotion();
 
-  // One shared rhythm for the whole page. Entrances move a short distance and
-  // only ever animate transform and opacity, so nothing triggers layout work.
   const rise = {
-    hidden: { opacity: 0, y: reduceMotion ? 0 : 14 },
+    hidden: { opacity: 0, y: reduceMotion ? 0 : 18 },
     shown: { opacity: 1, y: 0 }
   };
 
-  const ease = [0.22, 1, 0.36, 1] as const;
-
   return (
     <div className="landing">
-      <motion.header
-        className="landing-bar"
-        initial={{ opacity: 0, y: reduceMotion ? 0 : -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease }}
-      >
-        <div className="landing-brand">
-          <div className="brand-mark">DTS</div>
-          <div>
-            <strong>Digital Trust Shield</strong>
-            <span>Authority signing &amp; verification</span>
-          </div>
+      {/* The hero is its own dark stage. The lattice needs depth to read, and
+          glow only reads as glow against something dark. */}
+      <section className="stage">
+        <div className="stage-scene">
+          <LatticeScene />
         </div>
-        <nav className="landing-actions">
-          <motion.button
-            className="ghost-button"
-            onClick={onSignIn}
-            whileHover={reduceMotion ? undefined : { y: -1 }}
-            whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-          >
-            Sign in
-          </motion.button>
-          <motion.button
-            className="primary-button"
-            onClick={onSignUp}
-            whileHover={reduceMotion ? undefined : { y: -1 }}
-            whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-          >
-            Sign up
-          </motion.button>
-        </nav>
-      </motion.header>
+        <div className="stage-veil" aria-hidden="true" />
 
-      <main className="landing-hero">
-        <motion.div
-          className="landing-copy"
-          initial="hidden"
-          animate="shown"
-          // 60ms between children: enough to read as a sequence, short enough
-          // that the whole block has settled before the eye finishes the line.
-          transition={{ staggerChildren: 0.06, delayChildren: 0.08 }}
+        <motion.header
+          className="stage-bar"
+          initial={{ opacity: 0, y: reduceMotion ? 0 : -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: EASE_OUT }}
         >
-          <motion.p className="eyebrow" variants={rise} transition={{ duration: 0.5, ease }}>
-            Proof that travels with the document
-          </motion.p>
-          <motion.h1 variants={rise} transition={{ duration: 0.5, ease }}>
-            Know whether a notice, receipt or poster is genuine.
-          </motion.h1>
-          <motion.p className="landing-lede" variants={rise} transition={{ duration: 0.5, ease }}>
-            An issuing authority signs a document once. The proof is hidden inside the
-            image itself, so it survives being forwarded, compressed and screenshotted —
-            and anyone can check it in seconds.
-          </motion.p>
-          <motion.div className="landing-cta" variants={rise} transition={{ duration: 0.5, ease }}>
+          <div className="landing-brand">
+            <div className="brand-mark">DTS</div>
+            <div>
+              <strong>Digital Trust Shield</strong>
+              <span>Authority signing &amp; verification</span>
+            </div>
+          </div>
+          <nav className="landing-actions">
+            <motion.button
+              className="ghost-button on-dark"
+              onClick={onSignIn}
+              whileHover={reduceMotion ? undefined : { y: -1 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+            >
+              Sign in
+            </motion.button>
             <motion.button
               className="primary-button"
               onClick={onSignUp}
-              whileHover={reduceMotion ? undefined : { y: -2 }}
+              whileHover={reduceMotion ? undefined : { y: -1 }}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+            >
+              Sign up
+            </motion.button>
+          </nav>
+        </motion.header>
+
+        <motion.div
+          className="stage-copy"
+          initial="hidden"
+          animate="shown"
+          transition={{ staggerChildren: 0.07, delayChildren: 0.15 }}
+        >
+          <motion.p className="stage-eyebrow" variants={rise} transition={{ duration: 0.55, ease: EASE_OUT }}>
+            Proof that travels with the document
+          </motion.p>
+          <motion.h1 variants={rise} transition={{ duration: 0.55, ease: EASE_OUT }}>
+            Know whether a notice, receipt or poster is genuine.
+          </motion.h1>
+          <motion.p className="stage-lede" variants={rise} transition={{ duration: 0.55, ease: EASE_OUT }}>
+            An issuing authority signs a document once. The proof is written into the
+            image itself — across the blocks the picture is already made of — so it
+            survives being forwarded, compressed and screenshotted.
+          </motion.p>
+          <motion.div className="stage-cta" variants={rise} transition={{ duration: 0.55, ease: EASE_OUT }}>
+            <motion.button
+              className="primary-button lg"
+              onClick={onSignUp}
+              whileHover={reduceMotion ? undefined : { y: -2 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.98 }}
             >
               Create an authority account
             </motion.button>
-            <a className="text-link" href="/apk">
+            <a className="text-link on-dark" href="/apk">
               Get the verifier app
             </a>
           </motion.div>
         </motion.div>
 
-        <motion.div
-          className="landing-figure"
-          initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.15, ease }}
+        <motion.p
+          className="stage-caption"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.8, delay: 0.7 }}
         >
-          <SealAnimation />
-        </motion.div>
-      </main>
+          <span className="seal-dot" />
+          Each lit point is a block carrying part of the signature
+        </motion.p>
+      </section>
 
       <section className="landing-cards">
         {FEATURES.map((feature, index) => {
@@ -124,11 +127,11 @@ export function Landing({
           return (
             <motion.article
               key={feature.title}
-              initial={{ opacity: 0, y: reduceMotion ? 0 : 18 }}
+              initial={{ opacity: 0, y: reduceMotion ? 0 : 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
-              transition={{ duration: 0.45, delay: index * 0.06, ease }}
-              whileHover={reduceMotion ? undefined : { y: -3 }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ duration: 0.5, delay: index * 0.07, ease: EASE_OUT }}
+              whileHover={reduceMotion ? undefined : { y: -4 }}
             >
               <Icon size={22} aria-hidden="true" />
               <h3>{feature.title}</h3>

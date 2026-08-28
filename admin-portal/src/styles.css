@@ -856,3 +856,117 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ===================== hero stage ===================== */
+
+.stage {
+  position: relative;
+  isolation: isolate;
+  min-height: min(88vh, 760px);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) clamp(18px, 5vw, 54px) var(--space-7);
+  background:
+    radial-gradient(circle at 50% 42%, #12302f 0%, #0b1a1b 55%, #071112 100%);
+  overflow: hidden;
+  color: #e9f4f2;
+}
+
+.stage-scene { position: absolute; inset: 0; z-index: -2; }
+.lattice-canvas { display: block; width: 100%; height: 100%; }
+
+/* Darkens the edges so the copy stays readable wherever the lattice
+   happens to be bright, without dimming the centre of the scene. */
+.stage-veil {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 30%, rgba(7, 17, 18, 0.72) 78%),
+    linear-gradient(to bottom, rgba(7, 17, 18, 0.55), transparent 28%, rgba(7, 17, 18, 0.8));
+}
+
+.stage-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-4); flex-wrap: wrap;
+  padding-bottom: var(--space-6);
+}
+.stage-bar .landing-brand strong { color: #f2faf8; }
+.stage-bar .landing-brand span { color: rgba(190, 214, 210, 0.75); }
+
+.stage-copy {
+  margin: auto 0;
+  max-width: 660px;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.stage-eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: var(--t-xs);
+  font-weight: 800;
+  color: #5eead4;
+}
+
+.stage h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 5.5vw, 3.6rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #f4fbfa;
+  text-wrap: balance;
+  max-width: 18ch;
+}
+
+.stage-lede {
+  margin: 0;
+  font-size: var(--t-lg);
+  line-height: 1.62;
+  color: rgba(206, 226, 222, 0.86);
+  max-width: 56ch;
+}
+
+.stage-cta {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--space-4); margin-top: var(--space-4);
+}
+
+.primary-button.lg { padding: 15px 28px; font-size: var(--t-base); }
+
+.ghost-button.on-dark {
+  border-color: rgba(158, 200, 194, 0.35);
+  color: #e9f4f2;
+}
+.ghost-button.on-dark:hover:not(:disabled) {
+  border-color: #5eead4; color: #5eead4; background: rgba(94, 234, 212, 0.08);
+}
+
+.text-link.on-dark {
+  color: #5eead4;
+  box-shadow: inset 0 -1px 0 rgba(94, 234, 212, 0.4);
+}
+.text-link.on-dark:hover { box-shadow: inset 0 -2px 0 #5eead4; }
+
+.stage-caption {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin: var(--space-6) 0 0;
+  font-size: var(--t-sm);
+  color: rgba(180, 206, 201, 0.7);
+}
+
+/* The cards sit on the light ground and lift over the stage edge, so the
+   two halves of the page read as one composition rather than two pages. */
+.landing-cards {
+  position: relative;
+  z-index: 1;
+  margin-top: calc(var(--space-6) * -1);
+}
+.landing-cards article { box-shadow: var(--shadow-md); }
+
+@media (max-width: 700px) {
+  .stage { min-height: auto; padding-bottom: var(--space-6); }
+  .stage-copy { margin: var(--space-6) 0 0; }
+  .landing-cards { margin-top: var(--space-5); }
+}
