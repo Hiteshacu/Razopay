@@ -53,10 +53,20 @@ def owner_email() -> str:
 
 
 def role_for(record: dict | None, email: str | None) -> str:
-    if email and email.lower() == owner_email():
+    address = (email or "").lower()
+    if address and address == owner_email():
         return ROLE_OWNER
+
     stored = str((record or {}).get("role") or "").lower()
-    return stored if stored in ROLES else ROLE_MEMBER
+    if stored in ROLES:
+        return stored
+
+    # No stored role. Accounts approved before roles existed have none, and
+    # defaulting a seeded address to member would strip administration from
+    # the very accounts configured to have it.
+    if address and address in settings.admin_emails:
+        return ROLE_ADMIN
+    return ROLE_MEMBER
 
 
 def can_administer(role: str) -> bool:
