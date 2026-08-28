@@ -116,8 +116,32 @@ fi
 | Forwarding through messaging apps | survives |
 | Stripping metadata | irrelevant — nothing is stored there |
 | Heavy cropping | **fails** — the blocks carrying the signature are cut away |
+| Mostly blank pages | signs, but see `self_check` below |
 | Photographing a screen | **fails** — moiré and perspective exceed recovery |
 | Very small images | **fails** — too few blocks to carry 2,272 bits |
+
+## Checking your own output
+
+`sign()` verifies its own result before handing it back. How hard is up to you:
+
+```python
+trustshield.sign(src, dst, private_key="./keys")                        # standard
+trustshield.sign(src, dst, private_key="./keys", self_check="strict")   # also survives WhatsApp
+trustshield.sign(src, dst, private_key="./keys", self_check=False)      # skip
+```
+
+| Level | Proves |
+| --- | --- |
+| `"standard"` *(default)* | the signature reads back out of the file you were handed |
+| `"strict"` | it also survives a downscale to 960px at JPEG quality 46, a screenshot, and a blur |
+| `False` | nothing — faster, and you take the engine's word for it |
+
+**Strict is a much stronger claim than most documents can meet.** A detailed
+page — a scanned paper, a dense form — has little left after a 4× downscale.
+Failing strict does not mean the document is unsigned: it signs, and it
+verifies. It just would not survive a messaging app.
+
+Standard is the default because it matches the promise: this file verifies.
 
 ## How it works
 

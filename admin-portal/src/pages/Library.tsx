@@ -88,14 +88,20 @@ export function Library({ onBack }: { onBack: () => void }) {
 
         <motion.section className="panel" variants={rise} transition={{ duration: 0.5, ease: EASE_OUT }}>
           <h2>Install</h2>
-          <Snippet label="bash" code={"pip install trustshield"} />
+          {/* Not on PyPI yet, so the working command goes first. Leading with
+              one that fails is worse than leading with a longer one. */}
+          <Snippet
+            label="bash"
+            code={'pip install "git+https://github.com/Hiteshacu/trust-shield.git#subdirectory=library"'}
+          />
           <p className="hint">
             Python 3.10 or newer. PDF signing needs a renderer, which is large, so
-            it is optional: <code>pip install "trustshield[pdf]"</code>
+            it is optional — add <code>#subdirectory=library</code> to the same URL
+            after installing <code>PyMuPDF</code>.
           </p>
           <p className="hint">
-            Not on PyPI yet — use the wheel above:{" "}
-            <code>pip install trustshield-0.1.0-py3-none-any.whl</code>
+            Once it is on PyPI this becomes <code>pip install trustshield</code>.
+            You can also grab the wheel above and install it directly.
           </p>
         </motion.section>
 
@@ -191,6 +197,39 @@ else
   echo "rejected"
 fi`}
           />
+        </motion.section>
+
+        <motion.section className="panel" variants={rise} transition={{ duration: 0.5, ease: EASE_OUT }}>
+          <h2>Checking your own output</h2>
+          <p>
+            <code>sign()</code> verifies its own result before handing it back.
+            How hard is up to you.
+          </p>
+          <Snippet
+            code={`trustshield.sign(src, dst, private_key="./keys")                      # standard
+trustshield.sign(src, dst, private_key="./keys", self_check="strict")  # survives WhatsApp
+trustshield.sign(src, dst, private_key="./keys", self_check=False)     # skip`}
+          />
+          <div className="status-list">
+            <div className="status-row tone-ok">
+              <code>standard</code>
+              <p>Default. Proves the signature reads back out of the file you were handed.</p>
+            </div>
+            <div className="status-row tone-warn">
+              <code>strict</code>
+              <p>Also proves it survives a downscale to 960px at JPEG quality 46, a screenshot and a blur.</p>
+            </div>
+            <div className="status-row tone-dim">
+              <code>False</code>
+              <p>Nothing. Faster, and you take the engine's word for it.</p>
+            </div>
+          </div>
+          <p className="hint">
+            <strong>Strict is a stronger claim than most documents can meet.</strong> A
+            detailed page — a scanned paper, a dense form — has little left after a
+            4× downscale. Failing strict does not mean the document is unsigned: it
+            signs, and it verifies. It just would not survive a messaging app.
+          </p>
         </motion.section>
 
         <motion.section className="panel" variants={rise} transition={{ duration: 0.5, ease: EASE_OUT }}>

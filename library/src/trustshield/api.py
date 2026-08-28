@@ -7,6 +7,7 @@ engine's business and does not need to be yours.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,6 +21,22 @@ WATERMARK_NOT_FOUND = "WATERMARK_NOT_FOUND"
 ERROR = "ERROR"
 
 SUPPORTED_SUFFIXES = {".png", ".jpg", ".jpeg", ".pdf"}
+
+#: How hard to check a signature after writing it.
+#:
+#: "standard" reads the signature straight back out of the file. That is the
+#: promise the library makes — this document verifies — and it is the default.
+#:
+#: "strict" additionally simulates the roughest journey a document survives in
+#: practice: a re-encode, a downscale to 960px wide at JPEG quality 46, a
+#: screenshot, and a blurred screenshot. Passing it means the document still
+#: verifies after being forwarded through a messaging app.
+#:
+#: Strict is a much stronger claim, and plenty of perfectly good documents
+#: cannot meet it — a mostly-white page has little detail left after a 4x
+#: downscale. Failing it does not mean the document is unsigned or unverifiable,
+#: which is why it is not the default.
+SELF_CHECK_LEVELS = ("standard", "strict", "off")
 
 
 class SigningError(Exception):
@@ -82,6 +99,51 @@ def _check_input(path: Path) -> None:
 
 
 
+
+# The engine takes its self-check strictness from this variable.
+_ENGINE_MODE_VAR = "SIGN_SELF_CHECK"
+
+
+def _self_check_level(value: str | bool) -> str:
+    """Normalise the self_check argument, accepting the old booleans."""
+    if value is True:
+        return "standard"
+    if value is False:
+        return "off"
+    level = str(value).strip().lower()
+    if level not in SELF_CHECK_LEVELS:
+        allowed = ", ".join(repr(name) for name in SELF_CHECK_LEVELS)
+        raise ValueError(f"self_check must be one of {allowed}, or True/False. Got {value!r}.")
+    return level
+
+
+def _signing_failure_message(raw: str, level: str, source: Path) -> str:
+    """Say what actually went wrong, and what to do about it.
+
+    The engine reports only which embedding strengths it tried, which tells
+    the caller nothing they can act on — the same message covers "this image
+    cannot hold a signature" and "this image holds one but would not survive
+    a messaging app", which call for completely different responses.
+    """
+    if "self-check failed" not in raw.lower():
+        return raw or "Signing failed."
+
+    if level == "strict":
+        return (
+            f"{source.name} was signed and verifies, but did not survive the strict "
+            f"durability check — a downscale to 960px wide at JPEG quality 46, which "
+            f"is roughly what a messaging app does. Detailed pages lose too much at "
+            f"that size. Use self_check='standard' if verifying the file you hand out "
+            f"is enough, which it usually is."
+        )
+    return (
+        f"The signature could not be read back out of {source.name} after writing it, "
+        f"at either embedding strength. This normally means the image has too little "
+        f"detail to hide a signature in — a mostly blank page, or one that is very "
+        f"small. Try a document with more visual content."
+    )
+
+
 def _public_pem_for(private_key_path: Path) -> Path:
     """Write the public half of a private key to a temporary PEM file."""
     import tempfile
@@ -108,20 +170,23 @@ def sign(
     output: str | Path | None = None,
     *,
     private_key: str | Path,
-    self_check: bool = True,
+    self_check: str | bool = "standard",
 ) -> SignResult:
     """Write a signature into a document's pixels.
 
     `private_key` may be the PEM file itself or the directory holding it.
 
-    `self_check` reads the signature straight back out of the file just
-    written and fails loudly if it cannot be recovered. Leave it on. It is
-    the difference between believing a document is signed and knowing it,
-    and the cost is one extra extraction pass.
+    `self_check` decides how hard the result is checked before you are handed
+    it — see SELF_CHECK_LEVELS. "standard" (the default) proves the signature
+    can be read back. "strict" also proves the document survives a messaging
+    app. False skips the check entirely, which is faster and means you are
+    taking the engine's word for it.
     """
     source = Path(image)
     _check_input(source)
     key_path = _resolve_key(private_key, PRIVATE_KEY_NAME)
+
+    level = _self_check_level(self_check)
 
     if output is None:
         output = source.with_name(f"{source.stem}_signed{source.suffix}")
@@ -140,18 +205,27 @@ def sign(
     # which inside an installed package points into site-packages and does
     # not exist — signing then fails with a confusing missing-file error.
     public_pem = _public_pem_for(key_path)
+    # The engine reads its strictness from the environment at check time, so
+    # this has to be set around the call rather than passed in. Restored
+    # afterwards so a library call never changes the caller's environment.
+    previous = os.environ.get(_ENGINE_MODE_VAR)
+    os.environ[_ENGINE_MODE_VAR] = "fast" if level == "standard" else "full"
     try:
         signature, written = sign_poster(
             source,
             destination,
             private_key_path=key_path,
             public_key_path=public_pem,
-            self_check=self_check,
+            self_check=level != "off",
         )
     except Exception as exc:  # the engine raises a variety of types
-        raise SigningError(str(exc) or exc.__class__.__name__) from exc
+        raise SigningError(_signing_failure_message(str(exc), level, source)) from exc
     finally:
         public_pem.unlink(missing_ok=True)
+        if previous is None:
+            os.environ.pop(_ENGINE_MODE_VAR, None)
+        else:
+            os.environ[_ENGINE_MODE_VAR] = previous
 
     return SignResult(
         output_path=Path(written),
@@ -225,7 +299,9 @@ def verify(image: str | Path, *, public_key: str | Path) -> VerifyResult:
     if isinstance(outcome, tuple):
         valid, message = outcome
         if valid:
-            return VerifyResult(AUTHENTIC, message or "Signature valid and content unchanged.")
+            # On success the engine hands back the base64 signature, not prose.
+            # Printing 344 characters of it at somebody is not an explanation.
+            return VerifyResult(AUTHENTIC, "Signature valid and content unchanged.")
         status, detail = _classify(message)
         return VerifyResult(status, detail)
 

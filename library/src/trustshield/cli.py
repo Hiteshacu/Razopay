@@ -49,7 +49,7 @@ def _sign(args: argparse.Namespace) -> int:
             args.image,
             args.output,
             private_key=args.key,
-            self_check=not args.no_self_check,
+            self_check=args.check,
         )
     except (FileNotFoundError, ValueError) as exc:
         print(f"{exc}", file=sys.stderr)
@@ -97,9 +97,13 @@ def build_parser() -> argparse.ArgumentParser:
     signer.add_argument("-o", "--output", default=None, help="where to write (default: <name>_signed.<ext>)")
     signer.add_argument("-k", "--key", required=True, help="private key file, or the directory holding it")
     signer.add_argument(
-        "--no-self-check",
-        action="store_true",
-        help="skip reading the signature back after writing it — faster, and you lose the guarantee",
+        "--check",
+        choices=["standard", "strict", "off"],
+        default="standard",
+        help=(
+            "how hard to check the result: standard reads the signature back "
+            "(default); strict also proves it survives a messaging app; off skips it"
+        ),
     )
     signer.set_defaults(func=_sign)
 
