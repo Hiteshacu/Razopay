@@ -717,6 +717,23 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
 }
 .modal-actions .download-button { margin: 0; }
 
+/* A download is a button now, not a link: the file is fetched with the
+   session's token rather than opened by URL. These reset the button
+   defaults that would otherwise show through. */
+button.icon-link,
+button.download-button {
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+}
+button.icon-link { background: none; }
+button.icon-link:disabled,
+button.download-button:disabled { opacity: 0.65; cursor: progress; }
+
+@keyframes dts-spin { to { transform: rotate(360deg); } }
+.spin { animation: dts-spin 1.1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
 /* ===================== signing dialog ===================== */
 
 /* Landscape: the work on the left, the steps on the right. A tall column of

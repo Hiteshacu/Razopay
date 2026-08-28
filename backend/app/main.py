@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from .config import ensure_local_storage_dirs, settings
 from .firebase_client import get_firestore_client, get_storage_bucket
@@ -23,7 +22,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/uploads", StaticFiles(directory=settings.local_upload_root, check_dir=False), name="uploads")
+# Signed documents are NOT served as static files. They were, and that made
+# every signed document readable by anyone who had or guessed its URL, with
+# no account check at all. They now go through /api/documents/{id}/file,
+# which knows who is asking.
 
 app.include_router(auth.router)
 app.include_router(authorities.router)
@@ -92,6 +94,7 @@ def health_check():
         "status": "ok",
         "firestore": firestore_status,
         "storage_mode": settings.storage_mode,
+        "document_store": settings.document_store_backend,
         "firebase_storage": firebase_storage_status,
         "persistence": {
             "registry": settings.registry_backend,

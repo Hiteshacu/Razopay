@@ -46,6 +46,23 @@ services:
       # --- Non-secret configuration ---
       - key: GROQ_MODEL
         value: llama-3.3-70b-versatile
+      # Signed documents go to an S3-compatible store. They used to be
+      # written to the container's own disk, which a free instance does not
+      # keep — every signed file was deleted by the next restart.
+      - key: DOCUMENT_STORE
+        value: "s3"
+      # Dashboard -> Environment. Endpoint and bucket are not secret; the two
+      # keys are. None are in this file, so none reach the repository.
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+
+      # Only governs the unused Firebase Storage path now.
       - key: USE_LOCAL_STORAGE
         value: "true"
       - key: FIREBASE_STORAGE_BUCKET

@@ -49,6 +49,17 @@ class Settings:
         or "http://127.0.0.1:8000"
     ).rstrip("/")
     firebase_storage_bucket: str = os.getenv("FIREBASE_STORAGE_BUCKET", "")
+    # Where signed documents are kept. "local" is disk, correct for a laptop
+    # and wrong for any host without a persistent disk. "s3" is any
+    # S3-compatible store — Backblaze B2, Cloudflare R2, AWS, MinIO — chosen
+    # over a provider's own API so that changing provider is a change of
+    # endpoint rather than a rewrite.
+    document_store_backend: str = os.getenv("DOCUMENT_STORE", "local").strip().lower()
+    s3_endpoint_url: str = os.getenv("S3_ENDPOINT_URL", "").strip()
+    s3_bucket: str = os.getenv("S3_BUCKET", "").strip()
+    s3_region: str = os.getenv("S3_REGION", "").strip()
+    s3_access_key_id: str = os.getenv("S3_ACCESS_KEY_ID", "").strip()
+    s3_secret_access_key: str = os.getenv("S3_SECRET_ACCESS_KEY", "").strip()
     master_key: str = os.getenv("MASTER_KEY", "")
     admin_username: str = os.getenv("ADMIN_USERNAME", "admin")
     admin_password: str = os.getenv("ADMIN_PASSWORD", "admin123")
@@ -123,7 +134,13 @@ class Settings:
 
     @property
     def storage_mode(self) -> str:
-        return "local" if self.use_local_storage else "firebase_storage"
+        """Where signed documents are kept.
+
+        Not use_local_storage, which now only governs the unused Firebase
+        Storage path — reporting that would tell an operator the opposite of
+        the truth about where their documents are.
+        """
+        return self.document_store_backend
 
 
 settings = Settings()

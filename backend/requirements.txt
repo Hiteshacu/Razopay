@@ -24,3 +24,8 @@ PyMuPDF==1.27.2.3
 # regular opencv-python here fails at import time on Render, not at build
 # time, which makes it look like a mystery 500.
 opencv-python-headless==4.13.0.92
+
+# --- Object storage for signed documents ---
+# S3 rather than Backblaze's own API: every object store speaks S3, so the
+# provider becomes an endpoint setting instead of a rewrite.
+boto3==1.43.82

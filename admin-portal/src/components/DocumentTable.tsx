@@ -1,7 +1,8 @@
-import { Check, Copy, Download } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
-import { SignedDocument, signedFileUrl } from "../api/client";
+import { SignedDocument } from "../api/client";
+import { DownloadButton } from "./DownloadButton";
 import { EASE_OUT } from "../motion";
 
 function Fingerprint({ hash }: { hash?: string }) {
@@ -71,16 +72,7 @@ export function DocumentTable({ documents }: { documents: SignedDocument[] }) {
                 <small>{new Date(document.created_at).toLocaleTimeString()}</small>
               </td>
               <td className="cell-action">
-                <a
-                  className="icon-link"
-                  href={signedFileUrl(document)}
-                  target="_blank"
-                  rel="noreferrer"
-                  download
-                >
-                  <Download size={15} aria-hidden="true" />
-                  <span>Download</span>
-                </a>
+                <DownloadButton document={document} />
               </td>
             </motion.tr>
           ))}

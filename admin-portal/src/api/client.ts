@@ -38,27 +38,36 @@ export function wakeService(): void {
 }
 
 /**
- * Build a download link that works from this browser.
+ * Download a signed document.
  *
- * Records signed before the backend knew its own public address carry a
- * hardcoded 127.0.0.1 origin, which only resolves on the machine that signed
- * them. Where that is the case, rebuild the link from the API origin and the
- * stored path so old documents stay downloadable.
+ * The file is fetched rather than linked to. A signed document is only
+ * visible to the account that signed it (or to an administrator), and that
+ * check lives behind an Authorization header the browser will not attach to
+ * a plain <a href>. So the bytes are pulled with the session's token and
+ * handed to the browser as a blob.
+ *
+ * Documents are ~1.6 MB, small enough that holding one in memory briefly is
+ * not worth the complexity of a streaming save.
  */
-export function signedFileUrl(document: {
-  download_url?: string;
-  signed_file_download_url?: string;
-  signed_file_storage_path?: string;
-}): string {
-  const stored = document.download_url ?? document.signed_file_download_url ?? "";
-  const isLoopback = /^https?:\/\/(127\.0\.0\.1|localhost)\b/i.test(stored);
-  if (stored && !isLoopback) return stored;
+export async function downloadSignedFile(document: {
+  document_id: string;
+  signed_filename?: string;
+}): Promise<void> {
+  const response = await apiClient.get(
+    `/api/documents/${encodeURIComponent(document.document_id)}/file`,
+    { responseType: "blob" }
+  );
 
-  const path = (document.signed_file_storage_path ?? "").replace(/^\/+/, "");
-  if (!path) return stored;
-
-  const origin = (apiClient.defaults.baseURL ?? "").replace(/\/+$/, "");
-  return `${origin}/uploads/${path}`;
+  const href = URL.createObjectURL(response.data as Blob);
+  const anchor = window.document.createElement("a");
+  anchor.href = href;
+  anchor.download = document.signed_filename ?? `${document.document_id}.png`;
+  window.document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  // Revoking immediately can cancel the save in some browsers; one turn of
+  // the event loop is enough for the click to have been taken.
+  window.setTimeout(() => URL.revokeObjectURL(href), 0);
 }
 
 export type Authority = {

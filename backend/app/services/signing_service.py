@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import mimetypes
 import shutil
 import tempfile
 from pathlib import Path
@@ -11,6 +10,7 @@ from fastapi import UploadFile
 from ..config import ensure_local_storage_dirs, settings
 from ..core.trust_shield_adapter import sign_file_adapter, visual_fingerprint_hex
 from .audit_service import AuditService, utc_now
+from .document_store import get_document_store
 from .firebase_service import FirebaseService
 from .private_key_store import PrivateKeyStore
 
@@ -39,8 +39,15 @@ class SigningService:
         safe_stem = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in stem).strip("_")
         return f"{safe_stem or 'document'}{suffix}"
 
-    def _local_download_url(self, signed_filename: str) -> str:
-        return f"{settings.public_base_url}/uploads/signed_documents/{signed_filename}"
+    @staticmethod
+    def _download_url(document_id: str) -> str:
+        """Where a client fetches the signed file.
+
+        Always this backend, never the object store directly. The link then
+        survives a change of storage provider, carries the per-account access
+        check, and never puts store credentials in front of a browser.
+        """
+        return f"{settings.public_base_url}/api/documents/{document_id}/file"
 
     async def sign_upload(
         self,
@@ -63,14 +70,12 @@ class SigningService:
 
         document_id = f"doc_{uuid4().hex[:16]}"
         output_suffix = ".pdf" if suffix == ".pdf" else ".png"
-        if settings.use_local_storage:
-            upload_path = self.original_dir / f"{document_id}_{original_filename}"
-            output_path = self.signed_dir / f"{document_id}_signed{output_suffix}"
-        else:
-            upload_path = self.temp_dir / f"{document_id}_{original_filename}"
-            output_path = self.temp_dir / f"{document_id}_signed{output_suffix}"
-
-        signing_completed = False
+        # Both of these are scratch. The signed output is handed to the
+        # document store once the engine has finished with it, and the store
+        # decides where it durably lives — a second copy here would only be a
+        # copy that the next restart deletes.
+        upload_path = self.temp_dir / f"{document_id}_{original_filename}"
+        output_path = self.temp_dir / f"{document_id}_signed{output_suffix}"
 
         try:
             with upload_path.open("wb") as handle:
@@ -89,18 +94,13 @@ class SigningService:
                     )
                 finally:
                     public_key_path.unlink(missing_ok=True)
-            signing_completed = True
 
             signed_filename = output_path.name
-            if settings.use_local_storage:
-                storage_type = "local"
-                storage_path = f"signed_documents/{signed_filename}"
-                signed_url = self._local_download_url(signed_filename)
-            else:
-                storage_type = "firebase_storage"
-                storage_path = f"signed_documents/{authority_id}/{document_id}/signed_output{output_suffix}"
-                content_type = mimetypes.guess_type(str(output_path))[0] or "application/octet-stream"
-                signed_url = self.firebase.upload_file(output_path, storage_path, content_type=content_type)
+            store = get_document_store()
+            storage_path = f"signed_documents/{authority_id}/{document_id}/{signed_filename}"
+            store.put(output_path, storage_path)
+            storage_type = store.name
+            signed_url = self._download_url(document_id)
 
             metadata = {
                 "document_id": document_id,
@@ -159,10 +159,9 @@ class SigningService:
                 "debug": {"signature_type": type(sign_result["signature"]).__name__},
             }
         finally:
-            should_cleanup = (not settings.use_local_storage) or (settings.use_local_storage and not signing_completed)
-            if should_cleanup:
+            # Both paths are scratch now, whichever store is in use.
+            for scratch in (upload_path, output_path):
                 try:
-                    upload_path.unlink(missing_ok=True)
-                    output_path.unlink(missing_ok=True)
-                except Exception:
+                    scratch.unlink(missing_ok=True)
+                except OSError:
                     pass

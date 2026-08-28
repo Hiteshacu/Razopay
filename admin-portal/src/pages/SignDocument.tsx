@@ -1,10 +1,11 @@
 import axios from "axios";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import { Authority, PublicKey, signedFileUrl } from "../api/client";
+import { Authority, PublicKey } from "../api/client";
 import { signDocument } from "../api/signing";
 import { FileUploader } from "../components/FileUploader";
 import { KeySelector } from "../components/KeySelector";
+import { DownloadButton } from "../components/DownloadButton";
 import { ResultCard } from "../components/ResultCard";
 import { Modal } from "../components/Modal";
 import { SigningProgress } from "../components/SigningProgress";
@@ -90,15 +91,11 @@ export function SignDocument({
         <SigningProgress done={Boolean(result)} />
         {result && (
           <div className="modal-actions">
-            <a
+            <DownloadButton
+              document={result}
               className="download-button"
-              href={signedFileUrl(result)}
-              download={result.signed_filename}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Download signed document
-            </a>
+              label="Download signed document"
+            />
             <button className="ghost-button" onClick={() => setResult(null)}>
               Close
             </button>
@@ -115,15 +112,11 @@ export function SignDocument({
         <ResultCard title="Document signed successfully" tone="success">
           <p>Document ID: {result.document_id}</p>
           <p>Storage: {result.signed_file_storage_path}</p>
-          <a
+          <DownloadButton
+            document={result}
             className="download-button"
-            href={signedFileUrl(result)}
-            download={result.signed_filename}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Download signed document
-          </a>
+            label="Download signed document"
+          />
           <p className="hint">
             Share this file to demonstrate verification. Signed files are held on the
             server temporarily, so download it now rather than relying on this link later.
