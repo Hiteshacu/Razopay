@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trustshield"
+version = "0.1.0"
+description = "Sign images so the proof survives a screenshot — an RSA signature written into the pixels, not the metadata."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Hitesh", email = "hiteshacu@gmail.com" }]
+keywords = [
+    "watermark", "steganography", "provenance", "authenticity",
+    "rsa", "dct", "perceptual-hash", "c2pa", "deepfake",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Security :: Cryptography",
+]
+
+# Kept to what signing an image actually needs. opencv-headless rather than
+# opencv-python: the GUI build pulls in system libraries that do not exist in
+# a slim container, and fails at import rather than at install — which looks
+# like a mystery crash rather than a missing dependency.
+dependencies = [
+    "numpy>=1.24",
+    "opencv-python-headless>=4.8",
+    "Pillow>=10.0",
+    "cryptography>=42.0",
+]
+
+[project.optional-dependencies]
+# PDF signing needs a renderer, which is large. Most callers sign images.
+pdf = ["PyMuPDF>=1.24"]
+dev = ["pytest>=8.0", "build>=1.2"]
+
+[project.urls]
+Homepage = "https://github.com/Hiteshacu/trust-shield"
+Source = "https://github.com/Hiteshacu/trust-shield"
+Issues = "https://github.com/Hiteshacu/trust-shield/issues"
+
+[project.scripts]
+trustshield = "trustshield.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+trustshield = ["py.typed"]

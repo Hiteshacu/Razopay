@@ -22,12 +22,13 @@ import { Authorities } from "./pages/Authorities";
 import { Dashboard } from "./pages/Dashboard";
 import { KeyManagement } from "./pages/KeyManagement";
 import { Landing } from "./pages/Landing";
+import { Library } from "./pages/Library";
 import { SignDocument } from "./pages/SignDocument";
 import { SignedDocuments } from "./pages/SignedDocuments";
 import { MemberActivity } from "./pages/MemberActivity";
 import { Users } from "./pages/Users";
 
-type Screen = "landing" | "auth" | "console";
+type Screen = "landing" | "auth" | "library" | "console";
 
 type Approval = { approved: boolean; email: string | null; reason?: string; role: Role } | null;
 
@@ -188,6 +189,9 @@ export default function App() {
         <AuthPage mode={authMode} onModeChange={setAuthMode} onBack={() => setScreen("landing")} />
       );
     }
+    if (screen === "library") {
+      return <Library onBack={() => setScreen("landing")} />;
+    }
     return (
       <Landing
         onSignIn={() => {
@@ -198,6 +202,7 @@ export default function App() {
           setAuthMode("signup");
           setScreen("auth");
         }}
+        onLibrary={() => setScreen("library")}
       />
     );
   }

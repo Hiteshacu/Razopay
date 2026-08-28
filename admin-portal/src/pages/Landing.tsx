@@ -23,10 +23,12 @@ const FEATURES = [
 
 export function Landing({
   onSignIn,
-  onSignUp
+  onSignUp,
+  onLibrary
 }: {
   onSignIn: () => void;
   onSignUp: () => void;
+  onLibrary: () => void;
 }) {
   const reduceMotion = useReducedMotion();
 
@@ -59,6 +61,17 @@ export function Landing({
             </div>
           </div>
           <nav className="landing-actions">
+            {/* Developers come here to decide whether to build on this, which
+                is a question they have before they would ever sign up. So the
+                library sits beside the account buttons, not behind them. */}
+            <motion.button
+              className="text-link on-dark nav-link"
+              onClick={onLibrary}
+              whileHover={reduceMotion ? undefined : { y: -1 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+            >
+              Library
+            </motion.button>
             <motion.button
               className="ghost-button on-dark"
               onClick={onSignIn}

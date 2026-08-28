@@ -750,6 +750,105 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
 
 .panel h3 { display: flex; align-items: center; gap: 9px; }
 
+/* ===================== library page ===================== */
+
+.library-page { min-height: 100vh; background: var(--ground); }
+
+.library-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-4);
+  max-width: 860px; margin: 0 auto;
+  padding: var(--space-5) var(--space-5) 0;
+}
+.library-bar .back-link { margin-bottom: 0; }
+
+.library-inner {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-5) var(--space-7);
+  display: grid;
+  gap: var(--space-5);
+}
+
+.library-title { margin: var(--space-2) 0 var(--space-3); font-size: var(--t-3xl); letter-spacing: -0.02em; }
+.library-title code {
+  font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
+  background: none; border: 0; padding: 0; font-size: inherit; color: var(--ink);
+}
+.library-lede { font-size: var(--t-lg); line-height: 1.62; color: var(--ink-2); max-width: 60ch; margin: 0; }
+
+.library-page .panel h2 {
+  display: flex; align-items: center; gap: 9px;
+  margin: 0 0 var(--space-3);
+  font-size: var(--t-xl);
+}
+.library-page .panel > p { margin: 0 0 var(--space-3); max-width: 66ch; }
+
+/* Code blocks scroll inside themselves; the page never scrolls sideways. */
+.snippet {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin: var(--space-3) 0;
+  background: #0d1a19;
+}
+.snippet-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: var(--t-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(184, 210, 205, 0.6);
+}
+.snippet-bar button {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: 0; cursor: pointer;
+  font: inherit; letter-spacing: inherit; text-transform: inherit;
+  color: #5eead4; padding: 2px 4px; border-radius: 4px;
+}
+.snippet-bar button:hover { background: rgba(94, 234, 212, 0.12); }
+.snippet pre {
+  margin: 0; padding: 14px 16px;
+  overflow-x: auto;
+  color: #d3e7e3;
+  font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+.snippet code { background: none; border: 0; padding: 0; color: inherit; font-size: inherit; }
+
+.key-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: var(--space-3); margin: var(--space-3) 0; }
+.key-split > div { border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--space-4); background: var(--surface-sunk); }
+.key-split code { display: block; margin-bottom: 6px; }
+.key-split strong { display: block; color: var(--ink); margin-bottom: 4px; }
+.key-split p { margin: 0; font-size: var(--t-sm); color: var(--ink-3); line-height: 1.55; }
+
+.status-list { display: grid; gap: 1px; margin: var(--space-3) 0; }
+.status-row {
+  display: grid; grid-template-columns: minmax(0, 190px) minmax(0, 1fr);
+  gap: var(--space-3); align-items: baseline;
+  padding: 10px var(--space-3); border-radius: var(--r-sm);
+}
+.status-row p { margin: 0; font-size: var(--t-sm); color: var(--ink-2); }
+.status-row code { border: 0; font-weight: 700; }
+.status-row.tone-ok   code { background: var(--accent-wash); color: var(--accent); }
+.status-row.tone-warn code { background: var(--warn-wash, rgba(180, 120, 20, 0.12)); color: var(--warn, #9a5b06); }
+.status-row.tone-bad  code { background: rgba(185, 28, 28, 0.1); color: #a52020; }
+.status-row.tone-dim  code { background: var(--surface-sunk); color: var(--ink-3); }
+
+.ok-cell  { color: var(--accent); font-weight: 600; }
+.bad-cell { color: var(--ink-3); }
+
+.download-button.sm { padding: 9px 16px; font-size: var(--t-sm); display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+
+.nav-link { background: none; border: 0; cursor: pointer; font: inherit; padding: 4px 2px; }
+
+@media (max-width: 620px) {
+  .status-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+
 /* ===================== signing dialog ===================== */
 
 /* Landscape: the work on the left, the steps on the right. A tall column of

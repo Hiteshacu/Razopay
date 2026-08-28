@@ -97,3 +97,10 @@ build/
 *.iml
 .DS_Store
 Thumbs.db
+
+# Library build artefacts. The shipped wheel lives in
+# admin-portal/public/lib/, which is served to developers.
+library/build/
+library/dist/
+library/src/*.egg-info/
+library/**/__pycache__/

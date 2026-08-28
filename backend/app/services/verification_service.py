@@ -20,20 +20,46 @@ class VerificationService:
         self.upload_dir = settings.temp_dir
 
     def _classify_error(self, exc: Exception) -> tuple[str, str]:
+        """Turn an engine failure into one of the four verdicts.
+
+        Order matters. Every "recovered, but ..." message the engine raises
+        also contains the word "watermark", so the specific verdicts have to
+        be tested before the generic nothing-was-found rules or they are
+        swallowed by them.
+
+        This previously matched on the words "signature" and "fingerprint",
+        neither of which appears in the engine's actual wrong-key message
+        ("...the selected public key did not validate it"). That fell through
+        to ERROR, and because the automatic retry across other keys fires only
+        on SIGNATURE_INVALID, it never fired — for exactly the case it exists
+        to handle. Several other real messages fell through too: "Failed to
+        extract watermark payload", "Forwarded-image recovery could not find
+        a matching signed image geometry", "Poster is too small to contain a
+        valid watermark".
+
+        Kept deliberately in step with trustshield.api._classify in the
+        library, so the same document gets the same verdict either way.
+        """
         message = str(exc) or exc.__class__.__name__
         lowered = message.lower()
+
+        if "did not validate" in lowered:
+            return "SIGNATURE_INVALID", "The hidden proof was found, but the RSA signature was invalid."
+
+        if "fingerprint did not match" in lowered or "content did not match" in lowered:
+            return "TAMPERED", "The hidden signature does not match the current visual content."
+
+        if "length does not match" in lowered or "length is invalid" in lowered:
+            return "WATERMARK_NOT_FOUND", "No complete Digital Trust Shield proof could be recovered."
+
         if (
-            "watermark marker not found" in lowered
-            or ("watermark" in lowered and ("not found" in lowered or "too weak" in lowered))
-            or "screenshot recovery could not find" in lowered
+            "watermark" in lowered
+            or "recovery could not" in lowered
             or "time budget" in lowered
             or "timed out" in lowered
         ):
             return "WATERMARK_NOT_FOUND", "No hidden Digital Trust Shield proof was found in this image."
-        if "signature" in lowered:
-            return "SIGNATURE_INVALID", "The hidden proof was found, but the RSA signature was invalid."
-        if "fingerprint" in lowered or "content did not match" in lowered:
-            return "TAMPERED", "The hidden signature does not match the current visual content."
+
         return "ERROR", message
 
     def _verify_with_public_key(
