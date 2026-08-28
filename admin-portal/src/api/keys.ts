@@ -14,8 +14,16 @@ export async function createAuthority(payload: {
   return data;
 }
 
+/**
+ * The keys this account may sign with.
+ *
+ * Not /api/keys/public, which is the open list the verification app reads
+ * and contains every key on the system. An operator should only ever be
+ * offered keys that are theirs to use, so the console asks the scoped
+ * endpoint instead.
+ */
 export async function listPublicKeys(authorityId?: string) {
-  const { data } = await apiClient.get<PublicKey[]>("/api/keys/public", {
+  const { data } = await apiClient.get<PublicKey[]>("/api/keys", {
     params: authorityId ? { authority_id: authorityId } : undefined
   });
   return data;

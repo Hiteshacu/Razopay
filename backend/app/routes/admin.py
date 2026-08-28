@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..security import (
     ROLE_ADMIN,
     ROLE_MEMBER,
-    can_see_all_documents,
+    can_see_all_records,
     list_all_users,
     owner_email,
     require_administrator,
@@ -61,7 +61,7 @@ def overview(admin: dict = Depends(require_administrator)):
     firebase = FirebaseService()
     users = list_all_users()
 
-    sees_everything = can_see_all_documents(admin.get("role", ROLE_MEMBER))
+    sees_everything = can_see_all_records(admin.get("role", ROLE_MEMBER))
     documents = firebase.list_signed_documents()
     if not sees_everything:
         documents = [

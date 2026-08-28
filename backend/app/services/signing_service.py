@@ -12,6 +12,7 @@ from ..core.trust_shield_adapter import sign_file_adapter, visual_fingerprint_he
 from .audit_service import AuditService, utc_now
 from .document_store import get_document_store
 from .firebase_service import FirebaseService
+from .key_service import KeyService
 from .private_key_store import PrivateKeyStore
 
 
@@ -56,9 +57,11 @@ class SigningService:
         key_id: str,
         signed_by: dict | None = None,
     ) -> dict:
-        authority = self.firebase.get_document("authorities", authority_id)
-        if not authority:
-            raise ValueError(f"Authority not found: {authority_id}")
+        # Ownership is checked here, not only in the console. The console
+        # offers an account nothing but its own authorities, but the console
+        # is not the security boundary — an authority_id is a form field, and
+        # anyone can post a different one.
+        authority = KeyService(self.firebase).require_authority(authority_id, signed_by)
         key = self.firebase.get_document("public_keys", key_id)
         if not key or key.get("authority_id") != authority_id:
             raise ValueError("Selected key does not belong to the selected authority.")

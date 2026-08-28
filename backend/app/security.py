@@ -73,25 +73,40 @@ def can_administer(role: str) -> bool:
     """Whether this role may approve accounts and manage people.
 
     Note what this does NOT grant: reading other accounts' documents. See
-    can_see_all_documents.
+    can_see_all_records.
     """
     return role in (ROLE_OWNER, ROLE_ADMIN)
 
 
-def can_see_all_documents(role: str) -> bool:
-    """Whether this role may see documents it did not sign.
+def can_see_all_records(role: str) -> bool:
+    """Whether this role may see another account's work.
+
+    "Work" is everything an account creates: its authorities, its keys and
+    its signed documents. One rule covers all three, because a split where
+    you could see somebody's keys but not their documents would be a rule
+    nobody could hold in their head.
 
     The owner alone — deliberately not every administrator. Administering
-    accounts and reading what other authorities have signed are different
+    accounts and reading what other authorities have produced are different
     powers, and conflating them means every promotion silently hands over
-    the archive too. A signed document is the signer's work; an
-    administrator's job is to decide who may hold an account, not to read
-    what they produced with it.
+    the archive too. An administrator's job is to decide who may hold an
+    account, not to read what they did with it.
 
     This is why it is a separate predicate rather than a call to
     can_administer: the two rules have to be able to move apart.
     """
     return role == ROLE_OWNER
+
+
+def username_for(email: str | None) -> str:
+    """The public-facing name of an account: the part before the @.
+
+    Verification is open to the public, so whoever checks a document can see
+    this. The local part alone is deliberate — enough for a citizen to tell
+    one signer from another, without publishing a working address for every
+    operator on the system.
+    """
+    return (email or "").split("@", 1)[0].strip().lower()
 
 
 def _bearer_token(authorization: str | None) -> str:

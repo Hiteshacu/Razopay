@@ -139,6 +139,7 @@ fun VerificationScreen(padding: PaddingValues) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var keys by remember { mutableStateOf<List<PublicKeyDto>>(emptyList()) }
+    var signerQuery by remember { mutableStateOf("") }
     var selectedKey by remember { mutableStateOf<PublicKeyDto?>(null) }
     var showKeyPicker by remember { mutableStateOf(false) }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
@@ -155,10 +156,39 @@ fun VerificationScreen(padding: PaddingValues) {
         runCatching { ApiClient.api.publicKeys() }
             .onSuccess {
                 keys = it.filter { key -> key.active }
-                selectedKey = keys.firstOrNull()
-                status = "Loaded ${keys.size} public keys"
+                status = if (keys.isEmpty()) {
+                    "No public keys published yet"
+                } else {
+                    "Ready - enter the signer's name to begin"
+                }
             }
             .onFailure { status = "Could not load public keys: ${it.message}" }
+    }
+
+    // Keys held by whoever the typed name matches.
+    //
+    // A blank name matches nothing, deliberately. The screen used to select
+    // the first key in the list on load, so tapping Verify checked the
+    // document against a key nobody had chosen -- and a failure then meant
+    // "wrong key", which reads exactly like "forged". Naming the signer
+    // first makes the answer mean something.
+    val matchingKeys = remember(keys, signerQuery) {
+        val query = signerQuery.trim().lowercase()
+        if (query.isEmpty()) {
+            emptyList()
+        } else {
+            keys.filter { (it.owner_username ?: "").contains(query) }
+        }
+    }
+    val matchedSigners = remember(matchingKeys) {
+        matchingKeys.mapNotNull { it.owner_username }.filter { it.isNotBlank() }.distinct()
+    }
+
+    // Settle on a key only when there is no choice to make. Picking one of
+    // several on the user's behalf would be the same mistake again.
+    LaunchedEffect(matchingKeys) {
+        selectedKey = matchingKeys.singleOrNull()
+        result = null
     }
 
     Column(
@@ -178,14 +208,44 @@ fun VerificationScreen(padding: PaddingValues) {
                     Text(selectedUri?.lastPathSegment ?: "Select image from gallery")
                 }
 
+                OutlinedTextField(
+                    value = signerQuery,
+                    onValueChange = { signerQuery = it },
+                    label = { Text("Who signed it?") },
+                    placeholder = { Text("e.g. pramila") },
+                    singleLine = true,
+                    enabled = keys.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (signerQuery.isNotBlank()) {
+                    Text(
+                        if (matchedSigners.isEmpty()) {
+                            "No signer named \"${signerQuery.trim()}\""
+                        } else {
+                            val count = matchingKeys.size
+                            "${matchedSigners.joinToString(", ")} - $count key" +
+                                if (count == 1) "" else "s"
+                        },
+                        color = if (matchedSigners.isEmpty()) Color(0xFFB91C1C) else Color(0xFF0F766E)
+                    )
+                }
+
                 OutlinedButton(
                     onClick = { showKeyPicker = true },
-                    enabled = keys.isNotEmpty(),
+                    // Only offer the picker when there is genuinely a choice.
+                    enabled = matchingKeys.size > 1,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        selectedKey?.let { "${it.authority_name} - ${it.key_id.takeLast(6)}" }
-                            ?: if (keys.isEmpty()) "No public keys available" else "Select authority/public key"
+                        when {
+                            keys.isEmpty() -> "No public keys available"
+                            signerQuery.isBlank() -> "Enter a name above first"
+                            matchingKeys.isEmpty() -> "No authority for that name"
+                            selectedKey != null ->
+                                "${selectedKey!!.authority_name} - ${selectedKey!!.key_id.takeLast(6)}"
+                            else -> "Choose one of ${matchingKeys.size} authorities"
+                        }
                     )
                 }
 
@@ -222,7 +282,7 @@ fun VerificationScreen(padding: PaddingValues) {
         }
 
         if (showKeyPicker) {
-            KeyPickerDialog(keys, onSelect = {
+            KeyPickerDialog(matchingKeys, onSelect = {
                 selectedKey = it
                 showKeyPicker = false
             }, onDismiss = { showKeyPicker = false })
@@ -410,10 +470,10 @@ private fun KeyPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Select authority/public key") },
+        title = { Text("Which authority?") },
         text = {
             if (keys.isEmpty()) {
-                Text("No active public keys were loaded from the backend.")
+                Text("This signer has no active public keys.")
             } else {
                 Column(
                     modifier = Modifier

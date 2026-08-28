@@ -8,6 +8,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from ..schemas import AuthorityCreate
+from ..security import can_see_all_records, username_for
 from .audit_service import AuditService
 from .firebase_service import FirebaseService
 from .private_key_store import PrivateKeyStore
@@ -37,27 +38,72 @@ class KeyService:
             self._key_store = PrivateKeyStore()
         return self._key_store
 
-    def create_authority(self, payload: AuthorityCreate) -> dict:
+    def create_authority(self, payload: AuthorityCreate, caller: dict | None = None) -> dict:
         authority_id = f"auth_{uuid4().hex[:12]}"
+        account_email = (caller or {}).get("email")
         data = {
             "authority_id": authority_id,
             "authority_name": payload.authority_name,
             "department": payload.department,
+            # The authority own contact address. Not the account that created
+            # it, and quite possibly a different organisation entirely.
             "email": payload.email,
             "created_at": utc_now(),
             "status": "ACTIVE",
+            # Who this belongs to. Everything downstream hangs off this one
+            # field: which keys an account may generate, which authorities it
+            # may sign with, and what its console shows it.
+            "created_by_uid": (caller or {}).get("uid"),
+            "created_by_email": account_email,
+            "owner_username": username_for(account_email),
         }
         self.firebase.create_document("authorities", authority_id, data)
-        self.audit.record("AUTHORITY_CREATED", actor=payload.email, authority_id=authority_id, details=data)
+        self.audit.record("AUTHORITY_CREATED", actor=account_email or payload.email,
+                          authority_id=authority_id, details=data)
         return data
 
-    def list_authorities(self) -> list[dict]:
-        return self.firebase.list_collection("authorities")
+    @staticmethod
+    def _belongs_to(record: dict, caller: dict | None) -> bool:
+        """Whether this account may use this authority or key.
 
-    def generate_key_pair(self, authority_id: str, authority_name: str | None = None) -> dict:
+        The owner may use anything. Everyone else is held to what they
+        created, and a record with no creator belongs to nobody but the
+        owner rather than to whoever asks for it first.
+        """
+        caller = caller or {}
+        if can_see_all_records(caller.get("role", "member")):
+            return True
+        created_by = record.get("created_by_uid")
+        return bool(created_by) and created_by == caller.get("uid")
+
+    def list_authorities(self, caller: dict | None = None) -> list[dict]:
+        """The authorities this account may use.
+
+        Scoped, so one operator never sees another operator authority in
+        their console. Unscoped, every account could pick any authority on
+        the system and issue documents in its name.
+        """
+        authorities = self.firebase.list_collection("authorities")
+        return [a for a in authorities if self._belongs_to(a, caller)]
+
+    def require_authority(self, authority_id: str, caller: dict | None = None) -> dict:
+        """Fetch an authority this account may use, or refuse.
+
+        The same message either way. Distinguishing "no such authority" from
+        "not yours" would let an account map out the others by guessing ids.
+        """
         authority = self.firebase.get_document("authorities", authority_id)
-        if not authority:
+        if not authority or not self._belongs_to(authority, caller):
             raise ValueError(f"Authority not found: {authority_id}")
+        return authority
+
+    def generate_key_pair(
+        self,
+        authority_id: str,
+        authority_name: str | None = None,
+        caller: dict | None = None,
+    ) -> dict:
+        authority = self.require_authority(authority_id, caller)
 
         resolved_authority_name = authority_name or authority.get("authority_name") or "Unknown Authority"
         key_id = f"key_{uuid4().hex[:16]}"
@@ -87,6 +133,12 @@ class KeyService:
             "active": True,
             "fingerprint_sha256": fingerprint,
             "storage_path_optional": f"public_keys/{authority_id}/{key_id}.pem",
+            # Copied from the authority rather than from the caller: the key
+            # belongs to whoever owns the authority, which stays true even if
+            # the two are ever created by different people.
+            "created_by_uid": authority.get("created_by_uid"),
+            "created_by_email": authority.get("created_by_email"),
+            "owner_username": authority.get("owner_username") or "",
         }
         self.firebase.create_document("public_keys", key_id, data)
         self.audit.record(
@@ -102,7 +154,19 @@ class KeyService:
         return data
 
     def list_public_keys(self, authority_id: str | None = None) -> list[dict]:
+        """Every public key on the system, for anyone who asks.
+
+        Deliberately unscoped and unauthenticated. Someone checking a notice
+        has no account and no idea which office issued it, so verification
+        has to be able to reach every key. These are public keys, and
+        publishing them is the entire point of having them.
+        """
         return self.firebase.list_public_keys(authority_id=authority_id)
+
+    def list_keys_for(self, caller: dict | None, authority_id: str | None = None) -> list[dict]:
+        """The keys this account may sign with, for the console."""
+        keys = self.firebase.list_public_keys(authority_id=authority_id)
+        return [key for key in keys if self._belongs_to(key, caller)]
 
     def get_public_key(self, key_id: str) -> dict:
         key = self.firebase.get_document("public_keys", key_id)

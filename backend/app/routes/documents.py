@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from ..security import can_see_all_documents
+from ..security import can_see_all_records
 from ..security import require_admin
 from ..services.document_store import DocumentNotFound, get_document_store
 from ..services.firebase_service import FirebaseService
@@ -20,7 +20,7 @@ def _visible_to(document: dict, caller: dict) -> bool:
     is never exposed to another. Promoting somebody to administrator lets
     them approve accounts; it does not open the archive to them.
     """
-    if can_see_all_documents(caller.get("role", "member")):
+    if can_see_all_records(caller.get("role", "member")):
         return True
     return bool(document.get("signed_by_uid")) and document.get("signed_by_uid") == caller.get("uid")
 
