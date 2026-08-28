@@ -1,4 +1,5 @@
 import { FileSignature, KeyRound, LayoutDashboard, ListChecks, ScrollText, ShieldCheck, UserCheck, Users2 } from "lucide-react";
+import { motion } from "motion/react";
 import type { ComponentType } from "react";
 
 type View = "dashboard" | "authorities" | "keys" | "sign" | "documents" | "audit" | "approvals" | "users";
@@ -15,6 +16,37 @@ const items: Array<{ id: View; label: string; icon: ComponentType<{ size?: numbe
   { id: "approvals", label: "Approvals", icon: UserCheck, adminOnly: true },
   { id: "users", label: "People", icon: Users2, adminOnly: true }
 ];
+
+function NavButton({
+  item,
+  active,
+  onSelect
+}: {
+  item: { id: View; label: string; icon: ComponentType<{ size?: number }> };
+  active: boolean;
+  onSelect: (view: View) => void;
+}) {
+  const Icon = item.icon;
+  return (
+    <button
+      className={active ? "nav-item active" : "nav-item"}
+      onClick={() => onSelect(item.id)}
+      aria-current={active ? "page" : undefined}
+    >
+      {/* One highlight shared across every item by layoutId, so changing
+          page slides it rather than fading one out and another in. */}
+      {active && (
+        <motion.span
+          layoutId="nav-pill"
+          className="nav-pill"
+          transition={{ type: "spring", stiffness: 420, damping: 34 }}
+        />
+      )}
+      <Icon size={17} />
+      <span>{item.label}</span>
+    </button>
+  );
+}
 
 export function Navbar({
   view,
@@ -33,7 +65,8 @@ export function Navbar({
   onSignOut?: () => void;
 }) {
   const administers = role === "owner" || role === "admin";
-  const visible = items.filter((item) => !item.adminOnly || administers);
+  const workspace = items.filter((item) => !item.adminOnly);
+  const administration = administers ? items.filter((item) => item.adminOnly) : [];
   return (
     <aside className="sidebar">
       <div className="brand-mark">DTS</div>
@@ -42,19 +75,18 @@ export function Navbar({
         <h1>Authority Console</h1>
       </div>
       <nav>
-        {visible.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              className={view === item.id ? "nav-item active" : "nav-item"}
-              onClick={() => onChange(item.id)}
-            >
-              <Icon size={18} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
+        {workspace.map((item) => (
+          <NavButton key={item.id} item={item} active={view === item.id} onSelect={onChange} />
+        ))}
+
+        {administration.length > 0 && (
+          <>
+            <p className="nav-section">Administration</p>
+            {administration.map((item) => (
+              <NavButton key={item.id} item={item} active={view === item.id} onSelect={onChange} />
+            ))}
+          </>
+        )}
       </nav>
       {onSignOut && (
         // Shown whenever a sign-out is possible, not only when the address is

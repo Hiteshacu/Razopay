@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiClient } from "../api/client";
+import { CountUp } from "../components/CountUp";
 
 type ManagedUser = {
   uid: string;
@@ -94,19 +95,19 @@ export function Users({ isOwner }: { isOwner: boolean }) {
       {overview && (
         <div className="metric-grid">
           <div className="metric">
-            <span>{overview.totals.users}</span>
+            <span><CountUp value={overview.totals.users} /></span>
             <p>Accounts</p>
           </div>
           <div className="metric">
-            <span>{overview.totals.administrators}</span>
+            <span><CountUp value={overview.totals.administrators} /></span>
             <p>Administrators</p>
           </div>
           <div className="metric">
-            <span>{overview.totals.pending_users}</span>
+            <span><CountUp value={overview.totals.pending_users} /></span>
             <p>Awaiting approval</p>
           </div>
           <div className="metric">
-            <span>{overview.totals.documents}</span>
+            <span><CountUp value={overview.totals.documents} /></span>
             <p>Documents signed</p>
           </div>
         </div>

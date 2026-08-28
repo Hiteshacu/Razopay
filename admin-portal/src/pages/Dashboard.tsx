@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "motion/react";
 import { AuditLog, Authority, PublicKey, SignedDocument } from "../api/client";
+import { CountUp } from "../components/CountUp";
 import { EASE_OUT } from "../motion";
 
 function Metric({
@@ -25,7 +26,9 @@ function Metric({
     >
       {/* A zero while data is still in flight reads as "nothing here" rather
           than "not counted yet", which is alarming on a first load. */}
-      <span className={loading ? "metric-pending" : undefined}>{loading ? "–" : value}</span>
+      <span className={loading ? "metric-pending" : undefined}>
+        {loading ? "–" : <CountUp value={value} />}
+      </span>
       <p>{label}</p>
     </motion.div>
   );
