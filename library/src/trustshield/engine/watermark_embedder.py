@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import cv2
@@ -43,32 +44,37 @@ except ImportError:
     )
 
 
+# Set DTS_SUBTLE_EMBEDDING=1 to mark flat areas gently. Off by default —
+# see _embed_bit_in_block for why the visible carrier is the point.
+_SUBTLE_EMBEDDING = os.getenv("DTS_SUBTLE_EMBEDDING", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _embed_bit_in_block(block: np.ndarray, bit: int, base_strength: float) -> np.ndarray:
     """Embed one bit by reinforcing its ordering across several DCT carrier pairs."""
     centered = block.astype(np.float32) - 128.0
     dct_block = cv2.dct(centered)
 
-    # How much this block can absorb without showing it.
-    #
-    # The strength used to depend only on texture as a bonus: a busy block got
-    # a little more, but a blank one still got the full base strength. On a
-    # photograph that is invisible. On a document it is not — white paper has
-    # no detail to hide a change behind, so the carrier pattern shows through
-    # as faint diagonal hatching in the margins.
-    #
-    # So the strength is now scaled by what the block can hide, not only
-    # raised by what it can take. Blank paper is marked gently; inked and
-    # detailed areas carry the signature at full strength as before.
-    #
-    # This costs little robustness where it matters. Flat blocks are exactly
-    # the ones JPEG quantises hardest, so their bits were already the least
-    # reliable after compression — embedding hard in them was buying visible
-    # artefacts for votes that get lost anyway. Every block still carries its
-    # bit, so extraction is unchanged: the extractor reads the sign of the
-    # difference, never its size.
     activity = float(np.std(block))
-    masking = min(1.0, 0.30 + activity / 18.0)
-    strength = (base_strength + min(6.0, activity / 16.0)) * masking
+    strength = base_strength + min(6.0, activity / 16.0)
+
+    # Optional, and off by default.
+    #
+    # Marking a flat block as hard as a detailed one is visible on blank
+    # paper: the carrier shows as faint diagonal hatching in the margins.
+    # Scaling the strength down there cuts that from about six levels to two
+    # on a scanned page.
+    #
+    # It stays off because the visible carrier is the product. This scheme
+    # exists to survive a screenshot, and a screenshot keeps exactly what you
+    # can see — so a mark quiet enough to disappear from a margin is a mark
+    # closer to disappearing from the screenshot too. That trade belongs to
+    # whoever is signing, not to this function, and the honest default is the
+    # one that survives.
+    #
+    # Extraction is identical either way: the extractor reads the sign of the
+    # coefficient difference, never its magnitude.
+    if _SUBTLE_EMBEDDING:
+        strength *= min(1.0, 0.30 + activity / 18.0)
     for (a_row, a_col), (b_row, b_col) in WATERMARK_EMBED_COEFFICIENT_PAIRS:
         coeff_a = float(dct_block[a_row, a_col])
         coeff_b = float(dct_block[b_row, b_col])
