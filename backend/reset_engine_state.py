@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import stat
 import sys
 from pathlib import Path
 
@@ -138,24 +139,61 @@ def _local_targets() -> list[Path]:
     ]
 
 
+def _clear_read_only(path: Path) -> None:
+    """Make a path deletable again.
+
+    The engine chmods the registry and the key backups read-only after every
+    write, as a tamper check (utils._set_read_only). On Windows that makes
+    unlink fail outright with "Access is denied" rather than merely warn, so
+    a reset has to undo the protection it is about to delete.
+    """
+    try:
+        path.chmod(stat.S_IREAD | stat.S_IWRITE)
+    except OSError:
+        pass
+
+
+def _on_remove_error(func, path, _exc) -> None:
+    _clear_read_only(Path(path))
+    try:
+        func(path)
+    except OSError:
+        pass
+
+
+# onerror was replaced by onexc in 3.12; both hand the callback the same
+# three positional arguments, so one handler serves either.
+_RMTREE_KW = {"onexc": _on_remove_error} if sys.version_info >= (3, 12) else {"onerror": _on_remove_error}
+
+
+def _remove(path: Path) -> None:
+    if path.is_dir():
+        shutil.rmtree(path, **_RMTREE_KW)
+    else:
+        _clear_read_only(path)
+        path.unlink(missing_ok=True)
+
+
 def _wipe_local(*, commit: bool) -> list[str]:
     touched: list[str] = []
     for target in _local_targets():
-        if target.is_dir():
-            children = [child for child in target.iterdir()]
-            if not children:
-                continue
-            touched.append(f"{target} ({len(children)} entries)")
-            if commit:
-                for child in children:
-                    if child.is_dir():
-                        shutil.rmtree(child, ignore_errors=True)
-                    else:
-                        child.unlink(missing_ok=True)
-        elif target.is_file():
-            touched.append(str(target))
-            if commit:
-                target.unlink(missing_ok=True)
+        # Each target is independent: one stubborn path used to abandon the
+        # whole rest of the cleanup partway through.
+        try:
+            if target.is_dir():
+                children = list(target.iterdir())
+                if not children:
+                    continue
+                touched.append(f"{target} ({len(children)} entries)")
+                if commit:
+                    for child in children:
+                        _remove(child)
+            elif target.is_file():
+                touched.append(str(target))
+                if commit:
+                    _remove(target)
+        except OSError as exc:
+            touched.append(f"{target}  ! FAILED: {exc}")
     return touched
 
 
