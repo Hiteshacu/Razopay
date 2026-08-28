@@ -960,15 +960,25 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
 .stage-scene { position: absolute; inset: 0; z-index: -2; }
 .lattice-canvas { display: block; width: 100%; height: 100%; }
 
-/* Darkens the edges so the copy stays readable wherever the lattice
-   happens to be bright, without dimming the centre of the scene. */
+/* Keeps the copy readable without dimming the scene.
+   The lattice is large and sits right of centre, so the shading is directional
+   rather than a plain vignette: heavy down the left where the words are, open
+   over the lattice itself. Dimming the middle to protect the text would just
+   hide the thing the page is here to show. */
 .stage-veil {
   position: absolute;
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(ellipse at 50% 45%, transparent 30%, rgba(7, 17, 18, 0.72) 78%),
-    linear-gradient(to bottom, rgba(7, 17, 18, 0.55), transparent 28%, rgba(7, 17, 18, 0.8));
+    linear-gradient(
+      to right,
+      rgba(7, 17, 18, 0.88) 0%,
+      rgba(7, 17, 18, 0.62) 32%,
+      rgba(7, 17, 18, 0.12) 54%,
+      transparent 66%
+    ),
+    radial-gradient(ellipse at 63% 50%, transparent 30%, rgba(7, 17, 18, 0.58) 82%),
+    linear-gradient(to bottom, rgba(7, 17, 18, 0.5), transparent 26%, rgba(7, 17, 18, 0.78));
 }
 
 .stage-bar {
@@ -1049,6 +1059,14 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   margin-top: calc(var(--space-6) * -1);
 }
 .landing-cards article { box-shadow: var(--shadow-md); }
+
+@media (max-width: 900px) {
+  .stage-veil {
+    background:
+      radial-gradient(ellipse at 50% 45%, rgba(7, 17, 18, 0.35) 20%, rgba(7, 17, 18, 0.74) 80%),
+      linear-gradient(to bottom, rgba(7, 17, 18, 0.5), rgba(7, 17, 18, 0.35) 30%, rgba(7, 17, 18, 0.82));
+  }
+}
 
 @media (max-width: 700px) {
   .stage { min-height: auto; padding-bottom: var(--space-6); }
