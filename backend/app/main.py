@@ -72,6 +72,23 @@ def _email_transport() -> str:
     return EmailService().transport
 
 
+def _master_key_status() -> str:
+    """Is MASTER_KEY present and usable as a Fernet key?
+
+    A wrong-length or mistyped value fails the same way a missing one does,
+    from the caller's point of view, so the two are reported separately.
+    """
+    if not settings.master_key:
+        return "missing"
+    try:
+        from cryptography.fernet import Fernet
+
+        Fernet(settings.master_key.encode("utf-8"))
+    except Exception:
+        return "invalid: not a 32-byte url-safe base64 key"
+    return "configured"
+
+
 @app.get("/api/ping")
 def ping():
     """Cheapest possible proof that the process is running.
@@ -118,6 +135,13 @@ def health_check():
         "persistence": {
             "registry": settings.registry_backend,
             "private_keys": settings.key_store_backend,
+            # Whether keys can actually be written, which is not the same as
+            # which backend is configured. Without a usable MASTER_KEY the
+            # store refuses to construct, so key generation fails while every
+            # other line here still reads healthy — which is exactly the
+            # confusing state this field exists to make visible. Reports the
+            # shape of the key, never the key.
+            "master_key": _master_key_status(),
         },
         "admin_auth": {
             "required": settings.require_admin_auth,
