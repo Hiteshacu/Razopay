@@ -24,11 +24,13 @@ const FEATURES = [
 export function Landing({
   onSignIn,
   onSignUp,
-  onLibrary
+  onLibrary,
+  onVerify
 }: {
   onSignIn: () => void;
   onSignUp: () => void;
   onLibrary: () => void;
+  onVerify: () => void;
 }) {
   const reduceMotion = useReducedMotion();
 
@@ -64,6 +66,16 @@ export function Landing({
             {/* Developers come here to decide whether to build on this, which
                 is a question they have before they would ever sign up. So the
                 library sits beside the account buttons, not behind them. */}
+            {/* Verifying is the public half of this product and needs no
+                account, so it sits in the nav rather than behind sign-in. */}
+            <motion.button
+              className="text-link on-dark nav-link"
+              onClick={onVerify}
+              whileHover={reduceMotion ? undefined : { y: -1 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+            >
+              Verify a document
+            </motion.button>
             <motion.button
               className="text-link on-dark nav-link"
               onClick={onLibrary}
@@ -117,8 +129,16 @@ export function Landing({
             >
               Create an authority account
             </motion.button>
+            <motion.button
+              className="ghost-button on-dark lg"
+              onClick={onVerify}
+              whileHover={reduceMotion ? undefined : { y: -2 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+            >
+              Verify a document
+            </motion.button>
             <a className="text-link on-dark" href="/apk">
-              Get the verifier app
+              Or get the Android app
             </a>
           </motion.div>
         </motion.div>
