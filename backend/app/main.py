@@ -72,6 +72,22 @@ def _email_transport() -> str:
     return EmailService().transport
 
 
+def _document_store_status() -> str:
+    """Can the configured document store be constructed?
+
+    Constructing it validates the endpoint, bucket and credentials without
+    touching the network — the S3 client itself is built lazily on first use
+    — so this is cheap enough to answer on every health check.
+    """
+    try:
+        from .services.document_store import get_document_store
+
+        get_document_store()
+    except Exception as exc:
+        return f"error: {exc}"
+    return "ready"
+
+
 def _master_key_status() -> str:
     """Is MASTER_KEY present and usable as a Fernet key?
 
@@ -131,6 +147,12 @@ def health_check():
         "firestore": firestore_status,
         "storage_mode": settings.storage_mode,
         "document_store": settings.document_store_backend,
+        # Whether that store can actually be built, which is a different
+        # question from which one is named. A store missing its endpoint or
+        # credentials reports its backend happily here and then fails on the
+        # first signature — so the name alone was never enough to tell an
+        # operator whether signing would work.
+        "document_store_status": _document_store_status(),
         "firebase_storage": firebase_storage_status,
         "persistence": {
             "registry": settings.registry_backend,
