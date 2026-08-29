@@ -27,7 +27,14 @@ const VERDICTS: Record<
     tone: "ok",
     icon: CheckCircle2,
     headline: "Genuine",
-    plain: "This document was signed by that authority, and nothing in it has changed since."
+    // Says what was actually checked. It used to claim "nothing in it has
+    // changed since", which is more than this test establishes: the content
+    // check compares a perceptual fingerprint, and a measured 1% edit — an
+    // account number — does not move that fingerprint past its tolerance.
+    // Claiming more than the mathematics supports is the one thing a trust
+    // product cannot do.
+    plain:
+      "This document carries that authority's signature, and its content matches the version they signed."
   },
   TAMPERED: {
     tone: "warn",
@@ -316,9 +323,6 @@ export function Verify({ onBack }: { onBack: () => void }) {
                 {result.authority_name && (
                   <div><dt>Authority</dt><dd>{result.authority_name}</dd></div>
                 )}
-                {result.key_id && (
-                  <div><dt>Key</dt><dd className="mono">{result.key_id}</dd></div>
-                )}
                 <div><dt>Checked</dt><dd>{new Date().toLocaleString()}</dd></div>
               </dl>
             </motion.section>
@@ -327,8 +331,9 @@ export function Verify({ onBack }: { onBack: () => void }) {
 
         <p className="verify-foot">
           The proof lives in the pixels rather than the file's metadata, so it
-          survives a screenshot. Verification proves which key signed a document —
-          not who owns that key.
+          survives a screenshot. Verification proves which key signed a document,
+          not who owns that key — and it detects substantial alterations rather
+          than every possible one.
         </p>
       </div>
     </div>
