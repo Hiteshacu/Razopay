@@ -26,8 +26,14 @@ COPY backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r backend/requirements.txt
 
-# Engine at the root, then the backend package.
+# Engine at the root, then the razorpayx package, then the backend package.
+#
+# razorpayx/ is a directory, so it needs its own COPY: `COPY *.py ./` matches
+# root-level files only and would silently leave it out, which the image would
+# not complain about until the first request reached a payout advice route and
+# died on ModuleNotFoundError.
 COPY *.py ./
+COPY razorpayx/ razorpayx/
 COPY backend/ backend/
 
 # All runtime writes land on the mounted persistent disk at /data so the

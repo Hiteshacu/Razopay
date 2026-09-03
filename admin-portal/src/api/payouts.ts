@@ -1,4 +1,5 @@
 import axios from "axios";
+import { apiBaseUrl } from "./baseUrl";
 
 /**
  * The payout advice demonstration.
@@ -9,7 +10,7 @@ import axios from "axios";
  * need one to find out whether they are being defrauded.
  */
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000",
+  baseURL: apiBaseUrl(),
   // Issuing renders and signs a document; verification runs the engine's
   // recovery tiers and then reads five fields. Both are slower than a
   // typical request and neither should be cut off mid-flight.

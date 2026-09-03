@@ -1,4 +1,5 @@
 import axios from "axios";
+import { apiBaseUrl } from "./baseUrl";
 
 /**
  * The public verification API.
@@ -10,7 +11,7 @@ import axios from "axios";
  * one expires.
  */
 const publicClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000",
+  baseURL: apiBaseUrl(),
   // Verification runs up to four recovery tiers and is deadline-bounded at 35s
   // on the server. Leave room for that plus the upload itself.
   timeout: 120000
