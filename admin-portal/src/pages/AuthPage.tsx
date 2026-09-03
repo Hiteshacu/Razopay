@@ -84,7 +84,7 @@ export function AuthPage({
         >
           <ShieldCheck size={34} />
         </motion.div>
-        <p className="eyebrow">Digital Trust Shield</p>
+        <p className="eyebrow">PayProof</p>
         <AnimatePresence mode="wait" initial={false}>
           <motion.h1
             key={mode}

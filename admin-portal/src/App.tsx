@@ -142,7 +142,7 @@ export default function App() {
         await loadAll();
         setLoadError("");
       } catch {
-        setLoadError("Could not reach the Trust Shield service. Check that it is running, then reload.");
+        setLoadError("Could not reach the PayProof service. Check that it is running, then reload.");
       }
     } finally {
       setLoading(false);
@@ -222,13 +222,13 @@ export default function App() {
     return (
       <main className="login-shell">
         <section className="login-panel">
-          <p className="eyebrow">Digital Trust Shield</p>
+          <p className="eyebrow">PayProof</p>
           <h1>{unreachable ? "Cannot reach the service" : "Account awaiting approval"}</h1>
           <p className="loading-note">
             {unreachable
               ? "Signed in as " +
                 (approval.email ?? "this account") +
-                ", but the Trust Shield service did not respond. It may still be waking up — wait a moment and try again."
+                ", but the PayProof service did not respond. It may still be waking up — wait a moment and try again."
               : "Signed in as " +
                 (approval.email ?? "this account") +
                 ". Creating an account does not grant authority to sign documents. An existing administrator needs to approve this account first."}

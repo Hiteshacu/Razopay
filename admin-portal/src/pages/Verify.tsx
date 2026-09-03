@@ -55,7 +55,7 @@ const VERDICTS: Record<
     icon: HelpCircle,
     headline: "No proof found",
     plain:
-      "This document carries no Trust Shield signature. It was either never signed, or damaged past recovery — a heavy crop, or a photo of a screen."
+      "This document carries no PayProof signature. It was either never signed, or damaged past recovery — a heavy crop, or a photo of a screen."
   },
   ERROR: {
     tone: "dim",

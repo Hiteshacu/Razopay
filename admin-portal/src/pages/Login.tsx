@@ -26,7 +26,7 @@ export function Login({ onLogin }: { onLogin: () => void }) {
         <div className="login-icon">
           <ShieldCheck size={34} />
         </div>
-        <p className="eyebrow">Digital Trust Shield</p>
+        <p className="eyebrow">PayProof</p>
         <h1>Authority signing console</h1>
         <form onSubmit={handleSubmit}>
           <label>

@@ -69,9 +69,9 @@ export function Navbar({
   const administration = administers ? items.filter((item) => item.adminOnly) : [];
   return (
     <aside className="sidebar">
-      <div className="brand-mark">DTS</div>
+      <div className="brand-mark">PP</div>
       <div>
-        <p className="eyebrow">Digital Trust Shield</p>
+        <p className="eyebrow">PayProof</p>
         <h1>Authority Console</h1>
       </div>
       <nav>

@@ -902,6 +902,53 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   .verdict-facts > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
 
+/* ===================== measured results band ===================== */
+
+.landing-results {
+  max-width: 1120px; width: 100%; margin: var(--space-7) auto 0;
+  padding: 0 clamp(18px, 5vw, 54px);
+}
+.landing-results > * { min-width: 0; }
+.landing-results h2 {
+  margin: 0 0 var(--space-3); font-size: var(--t-2xl);
+  letter-spacing: -0.01em; color: var(--ink);
+}
+.results-lede {
+  margin: 0 0 var(--space-5); color: var(--ink-2);
+  line-height: 1.62; max-width: 68ch;
+}
+
+.results-grid {
+  display: grid; gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.result-tile {
+  display: grid; gap: 4px; align-content: start;
+  padding: var(--space-5);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-sm);
+  border-top: 3px solid var(--accent);
+}
+/* Tabular figures so 1.000 and 0.000 line up rather than jittering. */
+.result-tile strong {
+  font-size: var(--t-3xl); line-height: 1.05; color: var(--ink);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.result-label {
+  font-size: var(--t-sm); font-weight: 700; color: var(--accent);
+  text-transform: uppercase; letter-spacing: 0.07em;
+}
+.result-tile small { color: var(--ink-3); font-size: var(--t-sm); line-height: 1.5; }
+
+.results-caveat {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin: var(--space-4) 0 0; padding: 13px var(--space-4);
+  background: var(--warn-wash); border-radius: var(--r-md);
+  color: var(--ink-2); font-size: var(--t-sm); line-height: 1.6;
+  max-width: 78ch;
+}
+.results-caveat svg { flex: 0 0 auto; margin-top: 3px; color: #9a5b06; }
+
 /* ===================== payout advice demo ===================== */
 
 .advice-issued { display: grid; gap: var(--space-4); margin-top: var(--space-4); }

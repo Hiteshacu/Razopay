@@ -59,7 +59,7 @@ export function ApprovalPage({ token, onDone }: { token: string; onDone: () => v
         <div className="login-icon">
           <ShieldCheck size={34} />
         </div>
-        <p className="eyebrow">Digital Trust Shield</p>
+        <p className="eyebrow">PayProof</p>
 
         {done ? (
           <>
