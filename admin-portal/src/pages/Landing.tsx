@@ -27,12 +27,14 @@ export function Landing({
   onSignIn,
   onSignUp,
   onLibrary,
-  onVerify
+  onVerify,
+  onPayouts
 }: {
   onSignIn: () => void;
   onSignUp: () => void;
   onLibrary: () => void;
   onVerify: () => void;
+  onPayouts: () => void;
 }) {
   const reduceMotion = useReducedMotion();
   // One flag for the whole row: hooks cannot be called per item inside a map,
@@ -84,6 +86,14 @@ export function Landing({
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
             >
               Verify a document
+            </motion.button>
+            <motion.button
+              className="text-link on-dark nav-link"
+              onClick={onPayouts}
+              whileHover={reduceMotion ? undefined : { y: -1 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+            >
+              Payout advice
             </motion.button>
             <motion.button
               className="text-link on-dark nav-link"

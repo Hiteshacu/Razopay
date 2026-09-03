@@ -902,6 +902,45 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   .verdict-facts > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
 
+/* ===================== payout advice demo ===================== */
+
+.advice-issued { display: grid; gap: var(--space-4); margin-top: var(--space-4); }
+.advice-issued > * { min-width: 0; }
+
+/* The advice is a tall document. Capping the height keeps the page scannable
+   while leaving the figures legible, and the border stops a white document
+   from bleeding into a white panel. */
+.advice-preview {
+  width: 100%; max-height: 420px; object-fit: contain; object-position: top;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface-sunk);
+}
+
+.advice-issued .ghost-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  justify-self: start;
+  text-decoration: none;
+}
+
+/* ---- per-field results ---- */
+.field-checks { display: grid; gap: 6px; }
+.fc {
+  display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+  gap: var(--space-3); align-items: baseline;
+  padding: 10px 14px; border-radius: var(--r-sm);
+  font-size: var(--t-sm); border-left: 3px solid transparent;
+}
+.fc.ok  { background: var(--surface-sunk); border-left-color: var(--accent); }
+.fc.bad { background: var(--danger-wash); border-left-color: var(--danger); }
+.fc-name { font-weight: 700; color: var(--ink); }
+.fc.ok .fc-state  { color: var(--ink-3); }
+.fc.bad .fc-state { color: var(--ink-2); }
+.fc-state strong { font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace); }
+
+@media (max-width: 560px) {
+  .fc { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
+
 /* ===================== library page ===================== */
 
 .library-page { position: relative; min-height: 100vh; background: var(--ground); overflow-x: hidden; }

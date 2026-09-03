@@ -23,13 +23,14 @@ import { Dashboard } from "./pages/Dashboard";
 import { KeyManagement } from "./pages/KeyManagement";
 import { Landing } from "./pages/Landing";
 import { Library } from "./pages/Library";
+import { PayoutAdvice } from "./pages/PayoutAdvice";
 import { Verify } from "./pages/Verify";
 import { SignDocument } from "./pages/SignDocument";
 import { SignedDocuments } from "./pages/SignedDocuments";
 import { MemberActivity } from "./pages/MemberActivity";
 import { Users } from "./pages/Users";
 
-type Screen = "landing" | "auth" | "library" | "verify" | "console";
+type Screen = "landing" | "auth" | "library" | "verify" | "payouts" | "console";
 
 type Approval = { approved: boolean; email: string | null; reason?: string; role: Role } | null;
 
@@ -196,6 +197,9 @@ export default function App() {
     if (screen === "verify") {
       return <Verify onBack={() => setScreen("landing")} />;
     }
+    if (screen === "payouts") {
+      return <PayoutAdvice onBack={() => setScreen("landing")} />;
+    }
     return (
       <Landing
         onSignIn={() => {
@@ -208,6 +212,7 @@ export default function App() {
         }}
         onLibrary={() => setScreen("library")}
         onVerify={() => setScreen("verify")}
+        onPayouts={() => setScreen("payouts")}
       />
     );
   }
