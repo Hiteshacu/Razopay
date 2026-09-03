@@ -10,12 +10,14 @@ try:
     from .utils import (
         BASE_EMBED_STRENGTH,
         BLOCK_SIZE,
+        DCT_MATRIX,
         SIGNED_POSTER_PATH,
         WATERMARK_EMBED_COEFFICIENT_PAIRS,
-        block_coordinates,
+        blocks_to_image,
         build_watermark_payload,
         bytes_to_bits,
         crop_to_block_grid,
+        image_to_blocks,
         generate_image_fingerprint,
         read_image,
         signature_from_base64,
@@ -28,12 +30,14 @@ except ImportError:
     from utils import (
         BASE_EMBED_STRENGTH,
         BLOCK_SIZE,
+        DCT_MATRIX,
         SIGNED_POSTER_PATH,
         WATERMARK_EMBED_COEFFICIENT_PAIRS,
-        block_coordinates,
+        blocks_to_image,
         build_watermark_payload,
         bytes_to_bits,
         crop_to_block_grid,
+        image_to_blocks,
         generate_image_fingerprint,
         read_image,
         signature_from_base64,
@@ -45,17 +49,32 @@ except ImportError:
 
 
 # Set DTS_SUBTLE_EMBEDDING=1 to mark flat areas gently. Off by default —
-# see _embed_bit_in_block for why the visible carrier is the point.
+# see _embed_bits_in_blocks for why the visible carrier is the point.
 _SUBTLE_EMBEDDING = os.getenv("DTS_SUBTLE_EMBEDDING", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _embed_bit_in_block(block: np.ndarray, bit: int, base_strength: float) -> np.ndarray:
-    """Embed one bit by reinforcing its ordering across several DCT carrier pairs."""
-    centered = block.astype(np.float32) - 128.0
-    dct_block = cv2.dct(centered)
+def _embed_bits_in_blocks(
+    blocks: np.ndarray,
+    bits: np.ndarray,
+    base_strength: float,
+) -> np.ndarray:
+    """Embed one bit into each block of a stack, in a single batched pass.
 
-    activity = float(np.std(block))
-    strength = base_strength + min(6.0, activity / 16.0)
+    Writing a payload used to transform one 8x8 block per bit per repetition —
+    around 25,000 cv2.dct/cv2.idct pairs for a two-megapixel page, nearly all
+    of it interpreter and call overhead rather than arithmetic. Reading was
+    given the batched treatment already (see _votes_per_block); writing was
+    not, which is why signing cost several times what verifying did.
+
+    Every block is independent — the permutation assigns each carrier index
+    exactly once, so no block is written twice and order cannot matter. That
+    makes the whole schedule one matrix product.
+
+    The transform is the same one the extractor and the canonical hash use, so
+    fingerprints and recovered payloads are unchanged.
+    """
+    activity = blocks.std(axis=(1, 2))
+    strength = base_strength + np.minimum(6.0, activity / 16.0)
 
     # Optional, and off by default.
     #
@@ -74,26 +93,28 @@ def _embed_bit_in_block(block: np.ndarray, bit: int, base_strength: float) -> np
     # Extraction is identical either way: the extractor reads the sign of the
     # coefficient difference, never its magnitude.
     if _SUBTLE_EMBEDDING:
-        strength *= min(1.0, 0.30 + activity / 18.0)
+        strength = strength * np.minimum(1.0, 0.30 + activity / 18.0)
+
+    coefficients = DCT_MATRIX @ (blocks - 128.0) @ DCT_MATRIX.T
+
+    # Which coefficient the bit wants to be the larger of the pair.
+    wants_a_larger = bits.astype(bool)
+
     for (a_row, a_col), (b_row, b_col) in WATERMARK_EMBED_COEFFICIENT_PAIRS:
-        coeff_a = float(dct_block[a_row, a_col])
-        coeff_b = float(dct_block[b_row, b_col])
+        coeff_a = coefficients[:, a_row, a_col]
+        coeff_b = coefficients[:, b_row, b_col]
 
-        if bit == 1:
-            gap = coeff_a - coeff_b
-            if gap < strength:
-                shift = (strength - gap) / 2.0
-                dct_block[a_row, a_col] += shift
-                dct_block[b_row, b_col] -= shift
-        else:
-            gap = coeff_b - coeff_a
-            if gap < strength:
-                shift = (strength - gap) / 2.0
-                dct_block[a_row, a_col] -= shift
-                dct_block[b_row, b_col] += shift
+        # One expression for both bit values: the pair is pushed apart only
+        # where it does not already clear `strength` in the wanted direction,
+        # which is what the per-block branch did one block at a time.
+        gap = np.where(wants_a_larger, coeff_a - coeff_b, coeff_b - coeff_a)
+        shift = np.where(gap < strength, (strength - gap) / 2.0, 0.0)
+        toward_a = np.where(wants_a_larger, shift, -shift)
 
-    watermarked = cv2.idct(dct_block) + 128.0
-    return np.clip(watermarked, 0, 255)
+        coefficients[:, a_row, a_col] = coeff_a + toward_a
+        coefficients[:, b_row, b_col] = coeff_b - toward_a
+
+    return np.clip(DCT_MATRIX.T @ coefficients @ DCT_MATRIX + 128.0, 0, 255)
 
 
 def embed_signature(
@@ -138,16 +159,19 @@ def embed_signature(
         )
 
     permutation = watermark_permutation(total_blocks)
-    for repetition_index in range(repetition):
-        for bit_index, bit in enumerate(payload_bits):
-            block_index = permutation[repetition_index * payload_bits.size + bit_index]
-            row, col = block_coordinates(block_index, blocks_per_row)
-            block = luminance[row : row + BLOCK_SIZE, col : col + BLOCK_SIZE]
-            luminance[row : row + BLOCK_SIZE, col : col + BLOCK_SIZE] = _embed_bit_in_block(
-                block,
-                int(bit),
-                base_strength,
-            )
+
+    # The schedule the nested loop walked: carrier i holds payload bit
+    # i % payload_bits.size, at block permutation[i]. Laid out flat, it is a
+    # gather, one batched embed, and a scatter.
+    carrier_count = repetition * payload_bits.size
+    carriers = permutation[:carrier_count]
+    carrier_bits = np.tile(payload_bits, repetition)
+
+    stack = image_to_blocks(luminance)
+    grid = stack.shape
+    stack = stack.reshape(-1, BLOCK_SIZE, BLOCK_SIZE)
+    stack[carriers] = _embed_bits_in_blocks(stack[carriers], carrier_bits, base_strength)
+    luminance = blocks_to_image(stack.reshape(grid))
 
     ycrcb[:, :, 0] = np.clip(luminance, 0, 255).astype(np.uint8)
     signed_image = cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2BGR)
