@@ -191,7 +191,7 @@ export function LatticeScene() {
           if (gap > reachSquared) continue;
           const strength =
             (1 - Math.sqrt(gap) / reach) * (a.energy < b.energy ? a.energy : b.energy);
-          context!.strokeStyle = `rgba(45, 212, 191, ${strength * 0.5})`;
+          context!.strokeStyle = `rgba(51, 149, 255, ${strength * 0.5})`;
           context!.beginPath();
           context!.moveTo(a.sx, a.sy);
           context!.lineTo(b.sx, b.sy);
@@ -211,8 +211,8 @@ export function LatticeScene() {
             point.sx, point.sy, 0,
             point.sx, point.sy, radius * 7
           );
-          glow.addColorStop(0, `rgba(94, 234, 212, ${0.4 * energy * fog})`);
-          glow.addColorStop(1, "rgba(94, 234, 212, 0)");
+          glow.addColorStop(0, `rgba(51, 149, 255, ${0.4 * energy * fog})`);
+          glow.addColorStop(1, "rgba(51, 149, 255, 0)");
           context!.fillStyle = glow;
           context!.beginPath();
           context!.arc(point.sx, point.sy, radius * 7, 0, Math.PI * 2);
@@ -223,8 +223,8 @@ export function LatticeScene() {
           ? (0.3 + energy * 0.7) * fog
           : (0.16 + energy * 0.45) * fog * point.pulse;
         context!.fillStyle = point.carrier
-          ? `rgba(153, 246, 228, ${alpha})`
-          : `rgba(125, 176, 170, ${alpha})`;
+          ? `rgba(160, 205, 255, ${alpha})`
+          : `rgba(125, 160, 210, ${alpha})`;
         context!.beginPath();
         context!.arc(point.sx, point.sy, radius, 0, Math.PI * 2);
         context!.fill();
@@ -237,8 +237,8 @@ export function LatticeScene() {
           cursor.x, cursor.y, 0,
           cursor.x, cursor.y, CURSOR_REACH
         );
-        halo.addColorStop(0, `rgba(45, 212, 191, ${0.09 * cursorFade})`);
-        halo.addColorStop(1, "rgba(45, 212, 191, 0)");
+        halo.addColorStop(0, `rgba(51, 149, 255, ${0.09 * cursorFade})`);
+        halo.addColorStop(1, "rgba(51, 149, 255, 0)");
         context!.fillStyle = halo;
         context!.beginPath();
         context!.arc(cursor.x, cursor.y, CURSOR_REACH, 0, Math.PI * 2);

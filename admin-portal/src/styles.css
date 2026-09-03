@@ -11,28 +11,29 @@
    ================================================================= */
 
 :root {
-  /* Warm paper ground, teal ink. The palette follows the product's own
-     seal colour rather than a generic dashboard grey. */
-  --ground:       #f4f2ea;
-  --surface:      #fffefa;
-  --surface-sunk: #efece2;
-  --nav:          #101d1e;
-  --nav-raised:   #1b2c2c;
+  /* Cool paper ground, Razorpay blue ink. The palette follows the payments
+     brand this verifies for, so a payout advice and the console that issued
+     it read as one system rather than two products. */
+  --ground:       #f1f5fb;
+  --surface:      #ffffff;
+  --surface-sunk: #e9eff8;
+  --nav:          #02042b;
+  --nav-raised:   #0d1440;
 
-  --ink:    #131e1d;
-  --ink-2:  #41514f;
-  --ink-3:  #6d7d7a;
-  --ink-on-nav:   #eef3f2;
-  --ink-2-on-nav: #9fb3b0;
+  --ink:    #0b1b33;
+  --ink-2:  #3b4a63;
+  --ink-3:  #68768f;
+  --ink-on-nav:   #eaf1fc;
+  --ink-2-on-nav: #9db0d0;
 
-  --line:      #e3dfd2;
-  --line-soft: #edeae0;
+  --line:      #dce3ef;
+  --line-soft: #e9eef7;
 
-  --accent:       #0f766e;
-  --accent-deep:  #0b5a54;
-  --accent-wash:  #e4efed;
-  --accent-glow:  rgba(15, 118, 110, 0.16);
-  --gold:         #e6b93f;
+  --accent:       #0b63ce;
+  --accent-deep:  #08499c;
+  --accent-wash:  #e5eefc;
+  --accent-glow:  rgba(11, 99, 206, 0.16);
+  --brand:        #3395ff;   /* Razorpay's signature blue, for the mark */
 
   --ok:      #2f6d4f;
   --ok-wash: #dcebe0;
@@ -66,9 +67,9 @@
 
   /* Light and close, rather than the deep drop shadows that make every
      card look like it is floating off the page. */
-  --shadow-sm: 0 1px 2px rgba(19, 30, 29, 0.05);
-  --shadow-md: 0 4px 16px rgba(19, 30, 29, 0.07);
-  --shadow-lg: 0 18px 48px rgba(19, 30, 29, 0.16);
+  --shadow-sm: 0 1px 2px rgba(11, 27, 51, 0.05);
+  --shadow-md: 0 4px 16px rgba(11, 27, 51, 0.07);
+  --shadow-lg: 0 18px 48px rgba(11, 27, 51, 0.16);
 
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
@@ -128,8 +129,8 @@ button, input, select { font: inherit; }
   height: 46px;
   display: grid;
   place-items: center;
-  background: var(--gold);
-  color: var(--nav);
+  background: var(--brand);
+  color: #ffffff;
   font-weight: 900;
   font-size: var(--t-md);
   letter-spacing: 0.03em;
@@ -145,7 +146,7 @@ button, input, select { font: inherit; }
   font-size: var(--t-xs);
 }
 
-.sidebar .eyebrow { color: var(--gold); }
+.sidebar .eyebrow { color: var(--brand); }
 
 .sidebar h1 {
   margin: var(--space-1) 0 0;
@@ -193,7 +194,7 @@ nav { display: grid; gap: 2px; }
   font-size: var(--t-xs);
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: rgba(159, 179, 176, 0.65);
+  color: rgba(159, 178, 210, 0.65);
   font-weight: 800;
 }
 
@@ -219,7 +220,7 @@ nav { display: grid; gap: 2px; }
   margin-top: var(--space-2);
   align-self: flex-start;
   background: none; border: none; padding: 0;
-  color: #5eead4;
+  color: #3395ff;
   font-weight: 700;
   cursor: pointer;
   font-size: var(--t-sm);
@@ -228,7 +229,7 @@ nav { display: grid; gap: 2px; }
 
 .security-note {
   margin: 0;
-  color: rgba(159, 179, 176, 0.8);
+  color: rgba(159, 178, 210, 0.8);
   line-height: 1.55;
   font-size: var(--t-sm);
 }
@@ -635,7 +636,7 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
   padding: var(--space-5);
   background:
     radial-gradient(circle at 20% 15%, var(--accent-glow), transparent 45%),
-    radial-gradient(circle at 85% 80%, rgba(230, 185, 63, 0.14), transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(51, 149, 255, 0.14), transparent 40%),
     var(--ground);
 }
 
@@ -687,7 +688,7 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; }
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(12, 20, 19, 0.55);
+  background: rgba(6, 10, 35, 0.55);
   backdrop-filter: blur(3px);
   display: grid;
   place-items: center;
@@ -765,7 +766,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
   font-size: var(--t-xs); letter-spacing: 0.06em;
   color: var(--accent); background: var(--accent-wash);
-  border: 1px solid var(--accent-line, rgba(15, 118, 110, 0.25));
+  border: 1px solid var(--accent-line, rgba(11, 99, 206, 0.25));
   border-radius: var(--r-pill); padding: 4px 12px;
 }
 
@@ -791,7 +792,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
   font-size: 12px; font-weight: 700;
   color: var(--accent); background: var(--accent-wash);
-  border: 1px solid var(--accent-line, rgba(15, 118, 110, 0.3));
+  border: 1px solid var(--accent-line, rgba(11, 99, 206, 0.3));
 }
 .hint.no-top { margin-top: 0; }
 .hint.centered { text-align: center; }
@@ -809,7 +810,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
 .dropzone:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .dropzone strong { color: var(--ink); font-size: var(--t-md); word-break: break-word; }
 .dropzone small { color: var(--ink-3); font-size: var(--t-sm); }
-.dropzone.has-file { border-style: solid; border-color: var(--accent-line, rgba(15,118,110,0.35)); }
+.dropzone.has-file { border-style: solid; border-color: var(--accent-line, rgba(11, 99, 206,0.35)); }
 .dropzone-preview {
   max-width: 100%; max-height: 220px; border-radius: var(--r-sm);
   margin-bottom: var(--space-2); box-shadow: var(--shadow-sm);
@@ -835,7 +836,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   background: var(--surface); cursor: pointer;
   transition: border-color 0.18s ease, background 0.18s ease;
 }
-.authority:hover { border-color: var(--accent-line, rgba(15,118,110,0.4)); }
+.authority:hover { border-color: var(--accent-line, rgba(11, 99, 206,0.4)); }
 .authority.sel { border-color: var(--accent); background: var(--accent-wash); }
 .authority input { margin-top: 4px; accent-color: var(--accent); }
 .authority span { display: grid; gap: 2px; min-width: 0; }
@@ -1049,7 +1050,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
   font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.04em;
   color: var(--accent); background: var(--accent-wash);
-  border: 1px solid var(--accent-line, rgba(15, 118, 110, 0.25));
+  border: 1px solid var(--accent-line, rgba(11, 99, 206, 0.25));
   border-radius: var(--r-pill); padding: 3px 10px;
 }
 
@@ -1065,7 +1066,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
 .library-stats > div {
   display: grid; gap: 2px;
   padding: var(--space-3) var(--space-4);
-  border-left: 2px solid var(--accent-line, rgba(15, 118, 110, 0.3));
+  border-left: 2px solid var(--accent-line, rgba(11, 99, 206, 0.3));
   background: var(--surface);
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
 }
@@ -1094,18 +1095,18 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   background: rgba(255, 255, 255, 0.04);
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   font-size: var(--t-xs); letter-spacing: 0.09em; text-transform: uppercase;
-  color: rgba(184, 210, 205, 0.6);
+  color: rgba(184, 208, 246, 0.6);
   font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
 }
 .snippet-bar button {
   display: inline-flex; align-items: center; gap: 6px;
   background: none; border: 0; cursor: pointer;
   font: inherit; letter-spacing: inherit; text-transform: inherit;
-  color: #5eead4; padding: 4px 8px; border-radius: 5px;
+  color: #3395ff; padding: 4px 8px; border-radius: 5px;
   transition: background 0.18s ease, color 0.18s ease;
 }
-.snippet-bar button:hover { background: rgba(94, 234, 212, 0.14); }
-.snippet-bar button:focus-visible { outline: 2px solid #5eead4; outline-offset: 1px; }
+.snippet-bar button:hover { background: rgba(51, 149, 255, 0.14); }
+.snippet-bar button:focus-visible { outline: 2px solid #3395ff; outline-offset: 1px; }
 .snippet pre {
   margin: 0; padding: 15px 16px; overflow-x: auto;
   color: #d3e7e3; font-size: 12.5px; line-height: 1.68;
@@ -1185,7 +1186,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
   font-size: 12px; font-weight: 600;
   color: var(--accent); background: var(--accent-wash);
-  border: 1px solid var(--accent-line, rgba(15, 118, 110, 0.3));
+  border: 1px solid var(--accent-line, rgba(11, 99, 206, 0.3));
 }
 
 .step-body { padding-bottom: var(--space-5); min-width: 0; }
@@ -1262,7 +1263,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   overflow: hidden;
   min-height: 320px;
   border-radius: var(--r-md);
-  background: radial-gradient(circle at 50% 45%, #12302f 0%, #0b1a1b 58%, #071112 100%);
+  background: radial-gradient(circle at 50% 45%, #101c47 0%, #050a2b 58%, #02042b 100%);
 }
 .signing-visual .lattice-canvas { position: absolute; inset: 0; }
 
@@ -1272,21 +1273,21 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   margin: 0;
   font-size: var(--t-xs);
   line-height: 1.55;
-  color: rgba(184, 210, 205, 0.72);
+  color: rgba(184, 208, 246, 0.72);
 }
 
 /* Dims the lattice once there is a result, so the tick is what the eye lands
    on rather than competing with the motion behind it. */
 .signing-visual-veil {
   position: absolute; inset: 0;
-  background: rgba(7, 17, 18, 0.55);
+  background: rgba(2, 4, 43, 0.55);
 }
 
 .signing-seal { position: absolute; inset: 0; display: grid; place-items: center; }
 .signing-seal svg { width: 44%; max-width: 150px; height: auto; overflow: visible; }
-.signing-seal-ring { fill: rgba(45, 212, 191, 0.14); stroke: #5eead4; stroke-width: 3; }
+.signing-seal-ring { fill: rgba(51, 149, 255, 0.14); stroke: #3395ff; stroke-width: 3; }
 .signing-seal-tick {
-  fill: none; stroke: #5eead4; stroke-width: 6.5;
+  fill: none; stroke: #3395ff; stroke-width: 6.5;
   stroke-linecap: round; stroke-linejoin: round;
 }
 
@@ -1379,7 +1380,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
 .text-link {
   color: var(--accent); font-weight: 700; text-decoration: none;
   display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px;
-  box-shadow: inset 0 -1px 0 rgba(15, 118, 110, 0.35);
+  box-shadow: inset 0 -1px 0 rgba(11, 99, 206, 0.35);
 }
 .text-link:hover { box-shadow: inset 0 -2px 0 var(--accent); }
 
@@ -1441,9 +1442,9 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   flex-direction: column;
   padding: var(--space-4) clamp(18px, 5vw, 54px) var(--space-7);
   background:
-    radial-gradient(circle at 50% 42%, #12302f 0%, #0b1a1b 55%, #071112 100%);
+    radial-gradient(circle at 50% 42%, #101c47 0%, #050a2b 55%, #02042b 100%);
   overflow: hidden;
-  color: #e9f4f2;
+  color: #eaf2ff;
 }
 
 .stage-scene { position: absolute; inset: 0; z-index: -2; }
@@ -1461,13 +1462,13 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   background:
     linear-gradient(
       to right,
-      rgba(7, 17, 18, 0.88) 0%,
-      rgba(7, 17, 18, 0.62) 32%,
-      rgba(7, 17, 18, 0.12) 54%,
+      rgba(2, 4, 43, 0.88) 0%,
+      rgba(2, 4, 43, 0.62) 32%,
+      rgba(2, 4, 43, 0.12) 54%,
       transparent 66%
     ),
-    radial-gradient(ellipse at 63% 50%, transparent 30%, rgba(7, 17, 18, 0.58) 82%),
-    linear-gradient(to bottom, rgba(7, 17, 18, 0.5), transparent 26%, rgba(7, 17, 18, 0.78));
+    radial-gradient(ellipse at 63% 50%, transparent 30%, rgba(2, 4, 43, 0.58) 82%),
+    linear-gradient(to bottom, rgba(2, 4, 43, 0.5), transparent 26%, rgba(2, 4, 43, 0.78));
 }
 
 .stage-bar {
@@ -1476,7 +1477,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   padding-bottom: var(--space-6);
 }
 .stage-bar .landing-brand strong { color: #f2faf8; }
-.stage-bar .landing-brand span { color: rgba(190, 214, 210, 0.75); }
+.stage-bar .landing-brand span { color: rgba(190, 212, 248, 0.75); }
 
 .stage-copy {
   margin: auto 0;
@@ -1491,7 +1492,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   letter-spacing: 0.16em;
   font-size: var(--t-sm);
   font-weight: 800;
-  color: #5eead4;
+  color: #3395ff;
 }
 
 .stage h1 {
@@ -1508,7 +1509,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   margin: 0;
   font-size: var(--t-lg);
   line-height: 1.62;
-  color: rgba(206, 226, 222, 0.86);
+  color: rgba(206, 222, 250, 0.86);
   max-width: 56ch;
 }
 
@@ -1520,24 +1521,24 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
 .primary-button.lg { padding: 15px 28px; font-size: var(--t-base); }
 
 .ghost-button.on-dark {
-  border-color: rgba(158, 200, 194, 0.35);
-  color: #e9f4f2;
+  border-color: rgba(158, 190, 236, 0.35);
+  color: #eaf2ff;
 }
 .ghost-button.on-dark:hover:not(:disabled) {
-  border-color: #5eead4; color: #5eead4; background: rgba(94, 234, 212, 0.08);
+  border-color: #3395ff; color: #3395ff; background: rgba(51, 149, 255, 0.08);
 }
 
 .text-link.on-dark {
-  color: #5eead4;
-  box-shadow: inset 0 -1px 0 rgba(94, 234, 212, 0.4);
+  color: #3395ff;
+  box-shadow: inset 0 -1px 0 rgba(51, 149, 255, 0.4);
 }
-.text-link.on-dark:hover { box-shadow: inset 0 -2px 0 #5eead4; }
+.text-link.on-dark:hover { box-shadow: inset 0 -2px 0 #3395ff; }
 
 .stage-caption {
   display: flex; align-items: center; gap: var(--space-2);
   margin: var(--space-6) 0 0;
   font-size: var(--t-sm);
-  color: rgba(180, 206, 201, 0.7);
+  color: rgba(180, 204, 244, 0.7);
 }
 
 /* The cards sit on the light ground and lift over the stage edge, so the
@@ -1552,8 +1553,8 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
 @media (max-width: 900px) {
   .stage-veil {
     background:
-      radial-gradient(ellipse at 50% 45%, rgba(7, 17, 18, 0.35) 20%, rgba(7, 17, 18, 0.74) 80%),
-      linear-gradient(to bottom, rgba(7, 17, 18, 0.5), rgba(7, 17, 18, 0.35) 30%, rgba(7, 17, 18, 0.82));
+      radial-gradient(ellipse at 50% 45%, rgba(2, 4, 43, 0.35) 20%, rgba(2, 4, 43, 0.74) 80%),
+      linear-gradient(to bottom, rgba(2, 4, 43, 0.5), rgba(2, 4, 43, 0.35) 30%, rgba(2, 4, 43, 0.82));
   }
 }
 
