@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -45,6 +47,38 @@ app.include_router(payout_advice.router)
 @app.on_event("startup")
 def startup_checks():
     ensure_local_storage_dirs()
+
+    # Say plainly when identity is switched off.
+    #
+    # REQUIRE_ADMIN_AUTH defaults to false so a fresh checkout runs without a
+    # Firebase project, and the failure that causes when deployed is entirely
+    # silent: every request is admitted as the owner, and every key is written
+    # with an empty owner_username because there is no caller to name. Nothing
+    # errors. The first sign of trouble is the public verifier failing to find
+    # a signer who plainly exists, three screens from the cause.
+    if not settings.require_admin_auth:
+        print(
+            "WARNING: REQUIRE_ADMIN_AUTH is false. Every request is treated as "
+            "the owner and no signer is recorded on the keys this instance "
+            "creates. Set REQUIRE_ADMIN_AUTH=true on any deployment reachable "
+            "from the internet, then create authorities again — records made "
+            "now cannot be assigned an owner later.",
+            flush=True,
+        )
+
+    # Private keys and the registry on a container filesystem do not survive a
+    # redeploy. Losing them means the authority can never sign again, and the
+    # recovery path for a screenshotted document goes with the registry.
+    data_dir = os.getenv("DTS_DATA_DIR", "").strip()
+    if settings.key_store_backend == "local" and data_dir and not os.path.ismount(data_dir):
+        print(
+            f"WARNING: private keys are on the container filesystem "
+            f"({settings.secure_keys_dir}) and nothing is mounted at {data_dir}. "
+            "A redeploy will destroy them, and the authority will never sign "
+            "again. Mount a volume there, or set KEY_STORE_BACKEND=firestore "
+            "and REGISTRY_BACKEND=firestore.",
+            flush=True,
+        )
 
     # Without a persistent disk the registry has to live in Firestore, or the
     # proof needed to recover a watermark from a forwarded or screenshotted
