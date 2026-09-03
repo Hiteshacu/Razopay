@@ -1,6 +1,44 @@
 import axios from "axios";
 import { firebaseAuth } from "../firebase";
 
+/**
+ * The message to show a person when a request fails.
+ *
+ * FastAPI reports errors two different ways and the console has to read both.
+ * A raised HTTPException puts a plain string in `detail`; a request that fails
+ * schema validation puts a *list* of field errors there instead. Reading only
+ * the string case meant every validation failure — a malformed address, a name
+ * one character too short — arrived as the generic fallback, which tells the
+ * operator nothing about which field to fix.
+ */
+export function apiErrorMessage(exc: unknown, fallback: string): string {
+  if (!axios.isAxiosError(exc)) return fallback;
+
+  if (exc.code === "ECONNABORTED") {
+    return "The server took too long to answer. It may be waking up — try again.";
+  }
+  if (!exc.response) {
+    return "Could not reach the server. Check your connection and try again.";
+  }
+
+  const detail = exc.response.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+
+  if (Array.isArray(detail)) {
+    // ["body", "email"] -> "email"; the last segment is the field itself.
+    const parts = detail
+      .map((item) => {
+        const field = Array.isArray(item?.loc) ? String(item.loc[item.loc.length - 1]) : "";
+        const message = String(item?.msg ?? "").replace(/^Value error, /, "");
+        return field && message ? `${field}: ${message}` : message;
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join(" · ");
+  }
+
+  return fallback;
+}
+
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000",
   timeout: 120000

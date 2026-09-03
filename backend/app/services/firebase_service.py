@@ -23,6 +23,21 @@ class FirebaseService:
         docs = self.db.collection(collection).limit(limit).stream()
         return [doc.to_dict() for doc in docs]
 
+    def latest_document(self, collection: str, order_field: str) -> dict[str, Any] | None:
+        """The single most recent document in a collection.
+
+        Firestore orders and limits server-side, so this transfers one document
+        however large the collection grows. The caller used to read a page of
+        them and sort in Python, which made every write pay for the whole page.
+        """
+        docs = list(
+            self.db.collection(collection)
+            .order_by(order_field, direction="DESCENDING")
+            .limit(1)
+            .stream()
+        )
+        return docs[0].to_dict() if docs else None
+
     def get_document(self, collection: str, document_id: str) -> dict[str, Any] | None:
         snapshot = self.db.collection(collection).document(document_id).get()
         return snapshot.to_dict() if snapshot.exists else None

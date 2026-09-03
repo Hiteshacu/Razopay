@@ -1327,7 +1327,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
 
 .landing-foot {
   margin: var(--space-6) auto var(--space-7);
-  font-size: var(--t-sm); color: var(--ink-3);
+  font-size: var(--t-md); color: var(--ink-2);
   max-width: 1120px; width: 100%; padding: 0 clamp(18px, 5vw, 54px);
 }
 
@@ -1403,7 +1403,7 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  font-size: var(--t-xs);
+  font-size: var(--t-sm);
   font-weight: 800;
   color: #5eead4;
 }

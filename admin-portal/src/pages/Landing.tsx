@@ -1,6 +1,8 @@
 import { FileSignature, ScanLine, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import { useState } from "react";
 import { LatticeScene } from "../components/LatticeScene";
+import { isBackgrounded, useReached } from "../hooks/useReached";
 import { EASE_OUT } from "../motion";
 
 const FEATURES = [
@@ -33,6 +35,13 @@ export function Landing({
   onVerify: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  // One flag for the whole row: hooks cannot be called per item inside a map,
+  // and three cards side by side should arrive together anyway.
+  const [cardsRef, cardsShown] = useReached();
+  // Same reason as the cards: skip the entrance entirely when the page is
+  // being rendered somewhere nobody is watching, so the headline is never a
+  // blank space in a screenshot.
+  const [skipEntrance] = useState(isBackgrounded);
 
   const rise = {
     hidden: { opacity: 0, y: reduceMotion ? 0 : 18 },
@@ -51,7 +60,7 @@ export function Landing({
 
         <motion.header
           className="stage-bar"
-          initial={{ opacity: 0, y: reduceMotion ? 0 : -12 }}
+          initial={skipEntrance ? false : { opacity: 0, y: reduceMotion ? 0 : -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: EASE_OUT }}
         >
@@ -85,7 +94,7 @@ export function Landing({
               Library
             </motion.button>
             <motion.button
-              className="ghost-button on-dark"
+              className="text-link on-dark nav-link"
               onClick={onSignIn}
               whileHover={reduceMotion ? undefined : { y: -1 }}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
@@ -93,7 +102,7 @@ export function Landing({
               Sign in
             </motion.button>
             <motion.button
-              className="primary-button"
+              className="ghost-button on-dark"
               onClick={onSignUp}
               whileHover={reduceMotion ? undefined : { y: -1 }}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
@@ -105,7 +114,7 @@ export function Landing({
 
         <motion.div
           className="stage-copy"
-          initial="hidden"
+          initial={skipEntrance ? false : "hidden"}
           animate="shown"
           transition={{ staggerChildren: 0.07, delayChildren: 0.15 }}
         >
@@ -145,7 +154,7 @@ export function Landing({
 
         <motion.p
           className="stage-caption"
-          initial={{ opacity: 0 }}
+          initial={skipEntrance ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.7 }}
         >
@@ -154,15 +163,23 @@ export function Landing({
         </motion.p>
       </section>
 
-      <section className="landing-cards">
+      <section
+        className="landing-cards"
+        ref={cardsRef as React.RefObject<HTMLElement>}
+        aria-labelledby="how-it-works"
+      >
+        <h2 className="sr-only" id="how-it-works">How Trust Shield works</h2>
         {FEATURES.map((feature, index) => {
           const Icon = feature.icon;
           return (
             <motion.article
               key={feature.title}
-              initial={{ opacity: 0, y: reduceMotion ? 0 : 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.35 }}
+              initial={false}
+              animate={
+                cardsShown || reduceMotion
+                  ? { opacity: 1, y: 0 }
+                  : { opacity: 0, y: 20 }
+              }
               transition={{ duration: 0.5, delay: index * 0.07, ease: EASE_OUT }}
               whileHover={reduceMotion ? undefined : { y: -4 }}
             >
@@ -175,7 +192,8 @@ export function Landing({
       </section>
 
       <p className="landing-foot">
-        Verifying is open to everyone. This console is for issuing authorities.
+        <strong>Verifying is open to everyone.</strong> This console is for
+        issuing authorities.
       </p>
     </div>
   );

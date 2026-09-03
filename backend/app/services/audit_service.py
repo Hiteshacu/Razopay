@@ -17,11 +17,30 @@ class AuditService:
         self.firebase = firebase or FirebaseService()
 
     def _latest_hash(self) -> str:
-        logs = self.firebase.list_collection("audit_logs", limit=200)
-        if not logs:
-            return "0" * 64
-        latest = sorted(logs, key=lambda item: item.get("timestamp", ""), reverse=True)[0]
-        return str(latest.get("current_hash") or "0" * 64)
+        """The hash the next entry chains onto.
+
+        Every audit write needs this first, so it sits in front of creating an
+        authority, generating a key and signing a document. It used to fetch a
+        200-document page and sort it here, which meant the cost of the whole
+        page was paid before each of those operations could finish — the reason
+        they crawled on a small instance.
+
+        The fallback is deliberate: an ordered query needs the field to be
+        indexed, and entries written before `timestamp` existed would not
+        appear. Losing the chain entirely is worse than being slow, so a failed
+        query drops back to the old scan rather than raising.
+        """
+        try:
+            latest = self.firebase.latest_document("audit_logs", "timestamp")
+            if latest is None:
+                return "0" * 64
+            return str(latest.get("current_hash") or "0" * 64)
+        except Exception:
+            logs = self.firebase.list_collection("audit_logs", limit=200)
+            if not logs:
+                return "0" * 64
+            latest = sorted(logs, key=lambda item: item.get("timestamp", ""), reverse=True)[0]
+            return str(latest.get("current_hash") or "0" * 64)
 
     def record(
         self,
