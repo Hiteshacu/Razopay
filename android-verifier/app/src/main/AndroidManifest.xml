@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- RECORD_AUDIO was here for the assistant's voice input. The assistant
+         is gone and a verification app has no business asking for a
+         microphone: it is a permission prompt that costs installs and invites
+         exactly the suspicion this app exists to resolve. -->
 
     <application
         android:allowBackup="true"

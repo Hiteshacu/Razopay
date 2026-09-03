@@ -22,13 +22,24 @@ android {
         applicationId = "com.digitaltrustshield.verifier"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
-        // Public HTTPS backend, so the app works on mobile data and on any
-        // network — not only a laptop sharing the phone's Wi-Fi.
-        // For local backend work, swap in http://10.0.2.2:8000/ (emulator) or
-        // your machine's LAN IP, and re-enable cleartext in AndroidManifest.
-        buildConfigField("String", "API_BASE_URL", "\"https://trust-shield-api.onrender.com/\"")
+        versionCode = 2
+        versionName = "2.0"
+        // The DEFAULT address only. Whatever the user saves in Settings wins
+        // at runtime - see api/Backend.kt.
+        //
+        // This was https://trust-shield-api.onrender.com/, which had been
+        // superseded and now sleeps: its first request took over 25 seconds
+        // to answer, so the shipped app looked broken on launch. It points at
+        // the always-on service instead.
+        //
+        // For local work: http://10.0.2.2:8000/ from the emulator, or the
+        // machine's LAN address from a handset. Both need cleartext allowed
+        // in AndroidManifest, which release builds deliberately do not have.
+        buildConfigField(
+            "String",
+            "API_BASE_URL",
+            "\"https://p01--trust-shield-api--fbm4b6hyrltk.code.run/\""
+        )
     }
 
     compileOptions {
