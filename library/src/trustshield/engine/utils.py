@@ -54,9 +54,29 @@ WATERMARK_EXTRACT_COEFFICIENT_LAYOUTS = (
     WATERMARK_EMBED_COEFFICIENT_PAIRS,
     LEGACY_WATERMARK_COEFFICIENT_PAIRS,
 )
-# Keep signing visually quiet. Verification has a registry-guided correlation
-# fallback for WhatsApp and screenshots, so the signer does not need noisy marks.
-AUTO_EMBED_STRENGTHS = (24.0, 36.0)
+# The first rung is what almost every document is signed at: escalation only
+# happens when the full self-check runs and fails, and the payments path forces
+# the fast check because simulating a messaging round trip per advice is time a
+# synchronous API does not have.
+#
+# So the first rung decides robustness in practice, and it was measured rather
+# than chosen. Over 40 genuine advices through ten journeys each, with the
+# registry fallback active:
+#
+#   strength 24   35/40   loses a JPEG at quality 35
+#   strength 36   36/40   survives it
+#   strength 48   36/40   buys nothing further
+#
+# The cost is visibility, since the carrier is the mark: 24 renders at 35.5 dB
+# PSNR against the unsigned page, 36 at 33.9 dB, 48 at 32.5 dB. Paying 1.6 dB
+# to stop calling a genuine advice unsigned is worth it — a false "not issued"
+# is the expensive error here, and the document is a printed form rather than a
+# photograph, where a mark at 34 dB is not what anyone is looking at.
+#
+# A photo of a screen fails at every strength tested. That is geometry, not
+# signal: rescreening and perspective break the 8x8 block grid the carrier is
+# read from, and no amount of amplitude repairs a grid that has moved.
+AUTO_EMBED_STRENGTHS = (36.0, 48.0)
 BASE_EMBED_STRENGTH = AUTO_EMBED_STRENGTHS[0]
 MAX_REPETITION = 11
 PAYLOAD_VERSION = 2
