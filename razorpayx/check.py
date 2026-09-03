@@ -60,6 +60,12 @@ class Verdict:
     detail: str
     watermark_ok: bool
     findings: list[FieldFinding] = field(default_factory=list)
+    #: Where on the page the carrier is most damaged, when something is known
+    #: to be wrong. Set only for ALTERED: the signal cannot tell an edit from
+    #: a photograph of a screen on its own (measured: honest copies reach 20x
+    #: concentration, the weakest forgery 14x), so it is shown as evidence for
+    #: a verdict already reached and never used to reach one.
+    region: object | None = None
 
     @property
     def altered_fields(self) -> list[str]:
@@ -100,6 +106,24 @@ def _verify_watermark(image_path: Path, public_key_pem: str) -> tuple[bool, str]
             os.environ.pop("SIGN_SELF_CHECK", None)
         else:
             os.environ["SIGN_SELF_CHECK"] = previous
+
+
+def _locate_damage(image: np.ndarray):
+    """Point at the most damaged patch of carrier, for an already-made verdict.
+
+    Never allowed to fail a check. Localisation is evidence shown alongside an
+    answer, so a fault here should cost the reader a highlight, not the answer
+    itself.
+    """
+    try:
+        from .locate import locate, payload_bits_for
+
+        bits = payload_bits_for(image)
+        if bits is None:
+            return None
+        return locate(image, bits)
+    except Exception:
+        return None
 
 
 def check(
@@ -167,6 +191,7 @@ def check(
             f"{names} printed on it no longer matches what was issued. "
             f"Do not release goods against this document.",
             True, findings,
+            region=_locate_damage(image),
         )
 
     if len(findings) < len(CHECKED):
