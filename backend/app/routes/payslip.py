@@ -92,7 +92,10 @@ def _record_issued(issued, slip, caller: dict) -> str | None:
     """
     try:
         source = Path(issued.image_path)
-        document_id = f"slip_{issued.payout_id}"
+        # The slip id already begins with "slip_", so prefixing again produced
+        # slip_slip_9AJ122EWKVPR5Y. Used as-is: it is already unique and
+        # already says what it is.
+        document_id = issued.payout_id
         storage_path = f"signed_documents/{_AUTHORITY_ID}/{document_id}/{source.name}"
         store = get_document_store()
         store.put(source, storage_path)

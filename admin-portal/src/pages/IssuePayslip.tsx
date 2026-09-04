@@ -12,20 +12,20 @@ import { EASE_OUT } from "../motion";
 /**
  * Issue a payslip, the way RazorpayX Payroll would.
  *
- * Only the name is required. A payslip is checked by somebody the employee is
- * asking for something — a lender, a landlord, a background check — and the
- * name is what ties the document to the person standing in front of them, so
- * it is the one field the issuer must be told. Everything else is filled from
- * a sample, because a half-filled payslip is not a fair test of a reader that
- * has to find every field.
+ * Two fields, because two are what somebody issuing one actually decides: who
+ * it is for, and what they were paid. Those are also the two a forger changes
+ * — the name to make a stranger's slip their own, the salary to borrow against
+ * — so they are the two the field check is held to.
+ *
+ * The rest of the page is still printed, filled from a sample on the server. A
+ * reader that has to find every field is not tested by a document missing half
+ * of them, and nobody typing a payslip should have to invent a UAN.
  */
 export function IssuePayslip() {
   const reduceMotion = useReducedMotion();
 
   const [employee, setEmployee] = useState("");
   const [net, setNet] = useState("");
-  const [period, setPeriod] = useState("");
-  const [employer, setEmployer] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [issued, setIssued] = useState<IssuedPayslip | null>(null);
@@ -40,7 +40,12 @@ export function IssuePayslip() {
     setBusy(true);
     setIssued(null);
     try {
-      setIssued(await issuePayslip({ employee, net, period, employer }));
+      // Name and salary are what the issuer is told. Period and employer are
+      // filled from the sample on the server: they still have to be printed,
+      // because a reader that has to find every field is not tested by a page
+      // missing half of them — but nobody typing a payslip should have to
+      // invent them.
+      setIssued(await issuePayslip({ employee, net }));
     } catch (exc) {
       const detail = (exc as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(detail ?? "Could not issue the payslip. The service may be waking up — try again.");
@@ -76,10 +81,9 @@ export function IssuePayslip() {
         <p className="eyebrow">RazorpayX Payroll</p>
         <h2>Issue a payslip</h2>
         <p className="hint">
-          A lender, a landlord or a background check has no channel to a payroll
-          system — Account Aggregator carries data from regulated financial
-          institutions, and an employer is not one. So a payslip is trusted on
-          sight, or not at all. RazorpayX Payroll signs this one as it prints it.
+          Type a name and a salary. RazorpayX Payroll prints the slip and signs it
+          as it goes, so what you download already carries its proof — check it
+          later from the verifier, with no account.
         </p>
       </header>
 
@@ -121,27 +125,6 @@ export function IssuePayslip() {
                 />
               </div>
             </label>
-
-            <div className="slip-row">
-              <label className="cheque-line">
-                <span>Pay period</span>
-                <input
-                  type="text"
-                  value={period}
-                  placeholder="March 2026"
-                  onChange={(event) => setPeriod(event.target.value)}
-                />
-              </label>
-              <label className="cheque-line">
-                <span>Employer</span>
-                <input
-                  type="text"
-                  value={employer}
-                  placeholder="Leave blank for a sample"
-                  onChange={(event) => setEmployer(event.target.value)}
-                />
-              </label>
-            </div>
 
             <div className="cheque-foot">
               <span className="cheque-specimen">SPECIMEN</span>

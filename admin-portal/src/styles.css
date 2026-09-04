@@ -767,14 +767,6 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   padding: 4px 12px;
 }
 
-/* Period and employer share a row on a wide screen and stack on a narrow one,
-   because neither is long and both are optional. */
-.slip-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--space-4);
-}
-
 /* ---- RazorpayX mode switch ---- */
 
 .rzp-switch {
