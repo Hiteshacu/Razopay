@@ -23,14 +23,19 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from ..config import settings
+from ..security import require_admin
+from ..services.audit_service import AuditService
+from ..services.document_store import get_document_store
+from ..services.firebase_service import FirebaseService
 
 router = APIRouter(prefix="/api/payout-advice", tags=["payout-advice"])
 
@@ -61,12 +66,76 @@ def _keys() -> tuple[Path, Path]:
 _MODES = ("NEFT", "RTGS", "IMPS", "UPI")
 
 
+#: The issuing authority these advices are attributed to.
+#:
+#: A constant rather than an operator's authority, because these are signed
+#: with the demo key pair rather than anybody's real key. Recording them under
+#: a name of their own keeps them out of an authority's record while still
+#: letting them be listed, attributed and downloaded like any other document.
+_RZP_AUTHORITY_ID = "razorpayx_payouts"
+_RZP_AUTHORITY_NAME = "RazorpayX Payouts"
+
+
+def _record_issued(issued, advice, caller: dict) -> str | None:
+    """File an issued advice as a signed document, so the console can see it.
+
+    Without this the advice exists only on the container's disk: invisible to
+    the Documents tab, to an account's page under People, and to the download
+    route, which reads the object store rather than that directory. It was
+    signed by the system on somebody's behalf, so it is recorded the same way
+    anything else signed here is.
+
+    Never allowed to fail the request. The advice has already been rendered
+    and signed by this point, and losing the bookkeeping is worth less than
+    losing the document.
+    """
+    try:
+        source = Path(issued.image_path)
+        document_id = f"rzp_{issued.payout_id}"
+        storage_path = f"signed_documents/{_RZP_AUTHORITY_ID}/{document_id}/{source.name}"
+        get_document_store().put(source, storage_path)
+
+        FirebaseService().create_document("signed_documents", document_id, {
+            "document_id": document_id,
+            "authority_id": _RZP_AUTHORITY_ID,
+            "authority_name": _RZP_AUTHORITY_NAME,
+            "original_filename": f"{issued.payout_id}.png",
+            "signed_filename": source.name,
+            "file_type": "PNG",
+            "storage_type": get_document_store().name,
+            "signed_file_storage_path": storage_path,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "signature_status": "signed",
+            "status": "SIGNED",
+            "signed_by_uid": caller.get("uid"),
+            "signed_by_email": caller.get("email"),
+            "signing_mode": "invisible_watermark",
+            "payout_id": issued.payout_id,
+            "amount": advice.amount_text,
+            "mode": advice.mode,
+            "notes": "Payout advice issued and signed by RazorpayX.",
+        })
+
+        AuditService().record(
+            "DOCUMENT_SIGNED",
+            actor=caller.get("email") or "system",
+            actor_uid=caller.get("uid"),
+            authority_id=_RZP_AUTHORITY_ID,
+            document_id=document_id,
+        )
+        return document_id
+    except Exception as exc:  # pragma: no cover - bookkeeping must not block
+        print(f"WARNING: issued advice {issued.payout_id} was not recorded: {exc}", flush=True)
+        return None
+
+
 @router.post("/issue")
 async def issue_advice(
     seed: int | None = Form(None),
     amount: str | None = Form(None),
     beneficiary: str | None = Form(None),
     mode: str | None = Form(None),
+    caller: dict = Depends(require_admin),
 ):
     """Issue one signed advice and return what was printed on it.
 
@@ -124,6 +193,7 @@ async def issue_advice(
 
         issued = issue(advice, _DEMO_DIR / "issued",
                        private_key=private, public_key=public, seed=chosen)
+        document_id = _record_issued(issued, advice, caller)
         return {
             "payout_id": issued.payout_id,
             "amount": advice.amount_text,
@@ -132,6 +202,10 @@ async def issue_advice(
             "utr": advice.utr,
             "printed": issued.printed,
             "image_url": f"/api/payout-advice/image/{issued.payout_id}",
+            # Present when the advice was filed. The console downloads through
+            # the ordinary document route so the per-account rule applies to
+            # these exactly as it does to everything else.
+            "document_id": document_id,
         }
     except HTTPException:
         raise

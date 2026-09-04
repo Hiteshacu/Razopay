@@ -18,6 +18,15 @@ const client = axios.create({
 });
 
 export type IssuedAdvice = {
+  /**
+   * Set when the advice was filed as a signed document.
+   *
+   * Absent if the bookkeeping failed, which does not invalidate the advice —
+   * it was still rendered and signed. The console falls back to the demo
+   * image route so a download is still offered rather than withheld over a
+   * missing record.
+   */
+  document_id?: string | null;
   payout_id: string;
   amount: string;
   mode: string;

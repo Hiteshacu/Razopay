@@ -1,6 +1,7 @@
 import { Banknote, Download, Loader2, ShieldCheck } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
+import { downloadSignedFile } from "../api/client";
 import {
   adviceImageUrl,
   downloadAdvice,
@@ -57,7 +58,19 @@ export function IssuePayout() {
     if (!issued) return;
     setSaving(true);
     try {
-      await downloadAdvice(issued.payout_id);
+      // Through the document route when the advice was filed, so it is the
+      // same download the Documents tab and an account's page under People
+      // offer, and the same per-account rule decides who may take it. The
+      // demo image route is the fallback for an advice that was signed but
+      // not recorded.
+      if (issued.document_id) {
+        await downloadSignedFile({
+          document_id: issued.document_id,
+          signed_filename: `${issued.payout_id}.png`
+        });
+      } else {
+        await downloadAdvice(issued.payout_id);
+      }
     } catch {
       setError("The advice was issued, but the download failed. Try again.");
     } finally {
