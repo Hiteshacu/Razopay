@@ -1,13 +1,20 @@
 import axios from "axios";
+import { apiClient } from "./client";
 import { apiBaseUrl } from "./baseUrl";
 
 /**
- * The payout advice demonstration.
+ * The public half of the payout advice flow.
  *
  * Its own axios instance, with no auth token attached, for the same reason
  * the citizen verifier has one: a vendor deciding whether to release goods
  * has no RazorpayX account, and the whole argument is that they should not
  * need one to find out whether they are being defrauded.
+ *
+ * Issuing does not belong on it. That signs a document and files it against
+ * the account that asked, so it goes through apiClient, which attaches the
+ * caller's token. Sending an unauthenticated request to it fails as
+ * "Sign in to continue" while the sidebar still shows you signed in, which
+ * reads as a broken console rather than a missing header.
  */
 const client = axios.create({
   baseURL: apiBaseUrl(),
@@ -76,13 +83,13 @@ export async function issueAdvice(request: AdviceRequest = {}): Promise<IssuedAd
   if (request.amount) form.append("amount", request.amount);
   if (request.beneficiary) form.append("beneficiary", request.beneficiary);
   if (request.mode) form.append("mode", request.mode);
-  const { data } = await client.post<IssuedAdvice>("/api/payout-advice/issue", form);
+  const { data } = await apiClient.post<IssuedAdvice>("/api/payout-advice/issue", form);
   return data;
 }
 
 /** Download an issued advice as a file, rather than opening it in a tab. */
 export async function downloadAdvice(payoutId: string): Promise<void> {
-  const response = await client.get(`/api/payout-advice/image/${payoutId}`, {
+  const response = await apiClient.get(`/api/payout-advice/image/${payoutId}`, {
     responseType: "blob"
   });
   const href = URL.createObjectURL(response.data as Blob);
