@@ -45,6 +45,43 @@ _AUTHORITY_ID = "razorpayx_payroll"
 _AUTHORITY_NAME = "RazorpayX Payroll"
 
 
+def _record_key(kind: str, doc_id: str) -> str:
+    return f"{kind}:{doc_id}"
+
+
+def _save_issue_record(kind: str, issued) -> None:
+    """Keep the issued record somewhere a redeploy cannot reach.
+
+    It was written next to the image under the upload root, which on this host
+    is the container filesystem — nothing is mounted at /data, because keys and
+    the registry were moved to Firestore instead of a volume. So every deploy
+    erased every issued record, and checking a document handed out yesterday
+    answered "no advice was issued with that id", about one that was.
+
+    Firestore, alongside everything else this service cannot afford to lose.
+    """
+    try:
+        FirebaseService().create_document(
+            "issued_records",
+            _record_key(kind, issued.payout_id),
+            {"kind": kind, "doc_id": issued.payout_id, "printed": issued.printed},
+        )
+    except Exception as exc:  # pragma: no cover - the document still exists
+        print(f"WARNING: issued record {issued.payout_id} not persisted: {exc}", flush=True)
+
+
+def _load_issue_record(kind: str, doc_id: str) -> dict | None:
+    """The printed values for one issued document, or None if unknown."""
+    try:
+        record = FirebaseService().get_document("issued_records", _record_key(kind, doc_id))
+    except Exception:
+        return None
+    if not record:
+        return None
+    printed = record.get("printed")
+    return printed if isinstance(printed, dict) else None
+
+
 def _keys() -> tuple[Path, Path]:
     _SLIP_DIR.mkdir(parents=True, exist_ok=True)
     private, public = _SLIP_DIR / "priv.pem", _SLIP_DIR / "pub.pem"
@@ -192,6 +229,7 @@ async def issue_payslip_route(
         slip = slip.replace(**changes)
         issued = issue_payslip(slip, _SLIP_DIR / "issued",
                                private_key=private, public_key=public, seed=chosen)
+        _save_issue_record("payslip", issued)
         document_id = _record_issued(issued, slip, caller)
         return {
             "slip_id": issued.payout_id,
@@ -246,8 +284,9 @@ async def verify_payslip(
     from razorpayx.payslip import CHECKED as SLIP_CHECKED
 
     safe = "".join(ch for ch in slip_id if ch.isalnum() or ch == "_")
+    printed = _load_issue_record("payslip", safe)
     record_path = _SLIP_DIR / "issued" / f"{safe}.json"
-    if not record_path.is_file():
+    if printed is None and not record_path.is_file():
         raise HTTPException(
             status_code=404,
             detail="No payslip was issued with that id in this demo.",
@@ -262,9 +301,9 @@ async def verify_payslip(
         upload = Path(handle.name)
 
     try:
-        record = load_record(record_path)
+        values = printed if printed is not None else load_record(record_path).printed
         _, public = _keys()
-        verdict = check(read_image(upload), upload, record.printed,
+        verdict = check(read_image(upload), upload, values,
                         public.read_text(encoding="utf-8"), fields=SLIP_CHECKED)
         return {
             "status": verdict.status,

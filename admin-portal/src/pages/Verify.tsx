@@ -102,6 +102,10 @@ export function Verify({ onBack }: { onBack: () => void }) {
   const [payslipMode, setPayslipMode] = useState(false);
   const [payoutId, setPayoutId] = useState("");
   const [adviceVerdict, setAdviceVerdict] = useState<AdviceVerdict | null>(null);
+  // The uploaded file's own pixel dimensions. The region comes back in those,
+  // and the preview is displayed at whatever width fits, so the box has to be
+  // converted to percentages before it can be drawn on it.
+  const [naturalSize, setNaturalSize] = useState({ w: 1, h: 1 });
 
   useEffect(() => {
     wakePublicApi();
@@ -294,7 +298,17 @@ export function Verify({ onBack }: { onBack: () => void }) {
             }}
           >
             {preview && file?.type.startsWith("image/") ? (
-              <img src={preview} alt="" className="dropzone-preview" />
+              <img
+                src={preview}
+                alt=""
+                className="dropzone-preview"
+                onLoad={(event) =>
+                  setNaturalSize({
+                    w: event.currentTarget.naturalWidth || 1,
+                    h: event.currentTarget.naturalHeight || 1
+                  })
+                }
+              />
             ) : (
               <Upload size={26} aria-hidden="true" />
             )}
@@ -489,6 +503,31 @@ export function Verify({ onBack }: { onBack: () => void }) {
                 </div>
               </div>
               <p className="verdict-plain">{verdict.plain}</p>
+
+              {/* Where, drawn on the page the reader uploaded.
+                  Percentages rather than pixels: the preview is scaled to fit,
+                  and a box positioned in the original's pixel space would sit
+                  somewhere else entirely on a 1000px page shown at 460. */}
+              {preview && result.details?.damaged_region && (
+                <figure className="damage-figure">
+                  <div className="damage-frame">
+                    <img src={preview} alt="" />
+                    <span
+                      className="damage-box"
+                      style={{
+                        left: `${(result.details.damaged_region.left / naturalSize.w) * 100}%`,
+                        top: `${(result.details.damaged_region.top / naturalSize.h) * 100}%`,
+                        width: `${((result.details.damaged_region.right - result.details.damaged_region.left) / naturalSize.w) * 100}%`,
+                        height: `${((result.details.damaged_region.bottom - result.details.damaged_region.top) / naturalSize.h) * 100}%`
+                      }}
+                    />
+                  </div>
+                  <figcaption>
+                    The signature is damaged most here. Read from the proof in the
+                    pixels, not from any record of what the page used to say.
+                  </figcaption>
+                </figure>
+              )}
 
               {autoDetected && (
                 <p className="verdict-note">

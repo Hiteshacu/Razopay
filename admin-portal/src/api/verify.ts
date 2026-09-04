@@ -40,6 +40,22 @@ export type VerifyResult = {
   details?: {
     auto_detected_key?: boolean;
     selected_key_id?: string;
+    /**
+     * Where the carrier is most damaged, in the pixels of the file uploaded.
+     *
+     * Present only on TAMPERED. The signal cannot decide on its own — an
+     * untouched page has a peak too, it is just meaningless — so it is shown
+     * as evidence for a verdict already reached, never as the reason for one.
+     */
+    damaged_region?: {
+      left: number;
+      top: number;
+      right: number;
+      bottom: number;
+      peak_x: number;
+      peak_y: number;
+      concentration: number;
+    };
     [key: string]: unknown;
   };
 };

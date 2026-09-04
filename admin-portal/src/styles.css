@@ -827,6 +827,44 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
 .rzp-label strong { color: var(--ink); }
 .rzp-label small { color: var(--ink-3); font-size: var(--t-sm); line-height: 1.55; }
 
+/* ---- where the page was edited ---- */
+
+.damage-figure { margin: 0; display: grid; gap: var(--space-2); }
+
+/* The box is positioned against this, so it has to be exactly the size of the
+   rendered image — hence the inline-grid rather than a block that would
+   stretch to the panel and put the highlight in the wrong place. */
+.damage-frame {
+  position: relative;
+  display: inline-grid;
+  justify-self: center;
+  max-width: 100%;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.damage-frame img { display: block; max-width: 100%; height: auto; }
+
+/* Warn rather than danger. The box says "look here", not "this is the
+   forgery" — the peak is where the carrier is most damaged, which is where an
+   edit lands but is not itself the verdict. */
+.damage-box {
+  position: absolute;
+  border: 2px solid #9a5b06;
+  border-radius: 3px;
+  box-shadow: 0 0 0 9999px rgba(2, 4, 43, 0.42);
+  pointer-events: none;
+}
+
+.damage-figure figcaption {
+  font-size: var(--t-sm);
+  color: var(--ink-3);
+  line-height: 1.55;
+  text-align: center;
+  max-width: 52ch;
+  justify-self: center;
+}
+
 /* ---- per-field evidence ---- */
 
 .field-check { width: 100%; font-size: var(--t-sm); }
