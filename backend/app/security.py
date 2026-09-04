@@ -183,6 +183,24 @@ def admin_status(identity: dict) -> dict:
         )
         return {**identity, "approved": True, "reason": "bootstrap", "role": role}
 
+    if email and email in settings.demo_emails:
+        # Approved on sight, as a member. Recorded like any other account so
+        # it shows up under People and its work is attributable, rather than
+        # being a special case the rest of the console has to know about.
+        firebase.create_document(
+            ADMIN_COLLECTION,
+            uid,
+            {
+                "uid": uid,
+                "email": email,
+                "approved": True,
+                "approved_via": "demo",
+                "role": ROLE_MEMBER,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        return {**identity, "approved": True, "reason": "demo", "role": ROLE_MEMBER}
+
     now = datetime.now(timezone.utc)
 
     if not record:

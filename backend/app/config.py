@@ -79,6 +79,19 @@ class Settings:
     owner_email: str = os.getenv("OWNER_EMAIL", "").strip().lower()
     # Where approval requests are sent. Falls back to the owner.
     approval_notify_email: str = os.getenv("APPROVAL_NOTIFY_EMAIL", "").strip()
+    # Accounts approved on sight as ordinary members.
+    #
+    # Separate from ADMIN_EMAILS on purpose. A shared demo account has to work
+    # without anybody being awake to approve it, but seeding it through
+    # ADMIN_EMAILS would also make it an administrator — and an account whose
+    # password ships to every visitor must not be able to approve other
+    # accounts. This grants exactly one thing: the ability to sign in and use
+    # the console as a member.
+    demo_emails: tuple[str, ...] = tuple(
+        item.strip().lower()
+        for item in os.getenv("DEMO_EMAILS", "").split(",")
+        if item.strip()
+    )
     # Origin of the portal, used to build the link in the approval email.
     portal_base_url: str = os.getenv("PORTAL_BASE_URL", "http://localhost:5173").rstrip("/")
 
