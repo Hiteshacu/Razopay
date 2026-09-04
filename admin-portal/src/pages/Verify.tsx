@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { verifyAdvice, type AdviceVerdict } from "../api/payouts";
 import {
   listPublishedKeys,
   verifyDocument,
@@ -89,6 +90,13 @@ export function Verify({ onBack }: { onBack: () => void }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<VerifyResult | null>(null);
   const [failed, setFailed] = useState("");
+  // RazorpayX mode. A payout advice is checked against the record RazorpayX
+  // kept when it issued it, which is a different question from "did this key
+  // sign this file" and needs no key chosen: RazorpayX signs its own advices,
+  // so naming a signer would be asking the reader something already known.
+  const [razorpayMode, setRazorpayMode] = useState(false);
+  const [payoutId, setPayoutId] = useState("");
+  const [adviceVerdict, setAdviceVerdict] = useState<AdviceVerdict | null>(null);
 
   useEffect(() => {
     wakePublicApi();
@@ -137,13 +145,36 @@ export function Verify({ onBack }: { onBack: () => void }) {
   function pick(next: File | null) {
     setFile(next);
     setResult(null);
+    setAdviceVerdict(null);
     setFailed("");
+    // An issued advice downloads as <payout_id>.png, so the id is usually
+    // already in the reader's hand. Filling it saves them copying a string
+    // off the page, and it stays editable because a file can be renamed.
+    const stem = (next?.name ?? "").replace(/\.[^.]+$/, "");
+    if (/^[A-Za-z0-9_]{6,}$/.test(stem)) setPayoutId(stem);
+  }
+
+  async function runAdvice() {
+    if (!file || !payoutId.trim()) return;
+    setBusy(true);
+    setResult(null);
+    setAdviceVerdict(null);
+    setFailed("");
+    try {
+      setAdviceVerdict(await verifyAdvice(file, payoutId.trim()));
+    } catch (exc) {
+      const detail = (exc as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setFailed(detail ?? "The check could not be completed. Try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function run() {
     if (!file || !selectedKeyId) return;
     setBusy(true);
     setResult(null);
+    setAdviceVerdict(null);
     setFailed("");
     try {
       setResult(await verifyDocument(file, selectedKeyId));
@@ -184,6 +215,30 @@ export function Verify({ onBack }: { onBack: () => void }) {
 
         {loadError && <p className="error-text">{loadError}</p>}
 
+        {/* The one switch that changes what question is being asked. */}
+        <div className="rzp-switch">
+          <label>
+            <input
+              type="checkbox"
+              checked={razorpayMode}
+              onChange={(event) => {
+                setRazorpayMode(event.target.checked);
+                setResult(null);
+                setAdviceVerdict(null);
+                setFailed("");
+              }}
+            />
+            <span className="rzp-track" aria-hidden="true"><i /></span>
+            <span className="rzp-label">
+              <strong>RazorpayX payout advice</strong>
+              <small>
+                Checks it against the record RazorpayX kept when it issued it, using
+                RazorpayX's own key. No signer or key to choose.
+              </small>
+            </span>
+          </label>
+        </div>
+
         {/* ---- 1. the document ---- */}
         <section className="panel">
           <h2><span className="vstep">1</span> The document</h2>
@@ -214,66 +269,91 @@ export function Verify({ onBack }: { onBack: () => void }) {
           </button>
         </section>
 
-        {/* ---- 2. who signed it ---- */}
-        <section className="panel">
-          <h2><span className="vstep">2</span> Who signed it?</h2>
-          <p className="hint no-top">
-            The name of the office or person it claims to be from. Checking against
-            the wrong authority looks the same as a forgery, so this has to be named.
-          </p>
-          <input
-            className="verify-input"
-            type="text"
-            value={signer}
-            placeholder="e.g. pramila"
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(event) => setSigner(event.target.value)}
-            disabled={keys.length === 0}
-          />
-          {signer.trim() && (
-            <p className={signers.length ? "match-found" : "match-none"}>
-              {signers.length
-                ? `${signers.join(", ")} — ${matches.length} key${matches.length === 1 ? "" : "s"}`
-                : `No signer named "${signer.trim()}"`}
-            </p>
-          )}
-        </section>
-
-        {/* ---- 3. which authority ---- */}
-        <section className="panel">
-          <h2><span className="vstep">3</span> Which authority?</h2>
-          {matches.length === 0 ? (
+        {razorpayMode && (
+          <section className="panel">
+            <h2><span className="vstep">2</span> Which payout?</h2>
             <p className="hint no-top">
-              {signer.trim() ? "Nothing to choose — no keys for that name." : "Enter a name above first."}
+              The payout id printed on the advice. An advice downloaded from the
+              console is named after it, so choosing the file usually fills this in.
             </p>
-          ) : (
-            <div className="authority-list">
-              {matches.map((key) => (
-                <label key={key.key_id} className={selectedKeyId === key.key_id ? "authority sel" : "authority"}>
-                  <input
-                    type="radio"
-                    name="authority"
-                    checked={selectedKeyId === key.key_id}
-                    onChange={() => {
-                      setSelectedKeyId(key.key_id);
-                      setResult(null);
-                    }}
-                  />
-                  <span>
-                    <strong>{key.authority_name}</strong>
-                    <small>{key.key_id} · {key.algorithm}</small>
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
-        </section>
+            <input
+              className="verify-input"
+              type="text"
+              value={payoutId}
+              placeholder="e.g. pout_4f2c9a1b"
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(event) => setPayoutId(event.target.value)}
+            />
+          </section>
+        )}
+
+        {/* Both steps belong to the generic path only: in RazorpayX mode
+            the key is RazorpayX's own and there is nothing to pick. */}
+        {!razorpayMode && (
+          <>
+          {/* ---- 2. who signed it ---- */}
+          <section className="panel">
+            <h2><span className="vstep">2</span> Who signed it?</h2>
+            <p className="hint no-top">
+              The name of the office or person it claims to be from. Checking against
+              the wrong authority looks the same as a forgery, so this has to be named.
+            </p>
+            <input
+              className="verify-input"
+              type="text"
+              value={signer}
+              placeholder="e.g. pramila"
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(event) => setSigner(event.target.value)}
+              disabled={keys.length === 0}
+            />
+            {signer.trim() && (
+              <p className={signers.length ? "match-found" : "match-none"}>
+                {signers.length
+                  ? `${signers.join(", ")} — ${matches.length} key${matches.length === 1 ? "" : "s"}`
+                  : `No signer named "${signer.trim()}"`}
+              </p>
+            )}
+          </section>
+
+          {/* ---- 3. which authority ---- */}
+          <section className="panel">
+            <h2><span className="vstep">3</span> Which authority?</h2>
+            {matches.length === 0 ? (
+              <p className="hint no-top">
+                {signer.trim() ? "Nothing to choose — no keys for that name." : "Enter a name above first."}
+              </p>
+            ) : (
+              <div className="authority-list">
+                {matches.map((key) => (
+                  <label key={key.key_id} className={selectedKeyId === key.key_id ? "authority sel" : "authority"}>
+                    <input
+                      type="radio"
+                      name="authority"
+                      checked={selectedKeyId === key.key_id}
+                      onChange={() => {
+                        setSelectedKeyId(key.key_id);
+                        setResult(null);
+                      }}
+                    />
+                    <span>
+                      <strong>{key.authority_name}</strong>
+                      <small>{key.key_id} · {key.algorithm}</small>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </section>
+          </>
+        )}
 
         <motion.button
           className="primary-button lg verify-go"
-          disabled={!file || !selectedKeyId || busy}
-          onClick={run}
+          disabled={busy || !file || (razorpayMode ? !payoutId.trim() : !selectedKeyId)}
+          onClick={razorpayMode ? runAdvice : run}
           whileHover={reduceMotion || busy ? undefined : { y: -1 }}
           whileTap={reduceMotion || busy ? undefined : { scale: 0.99 }}
         >
@@ -283,7 +363,7 @@ export function Verify({ onBack }: { onBack: () => void }) {
               <span>Checking the pixels…</span>
             </>
           ) : (
-            <span>Verify this document</span>
+            <span>{razorpayMode ? "Check this payout advice" : "Verify this document"}</span>
           )}
         </motion.button>
 
@@ -293,6 +373,62 @@ export function Verify({ onBack }: { onBack: () => void }) {
           </p>
         )}
         {failed && <p className="error-text">{failed}</p>}
+
+        {/* The advice verdict is its own shape: it carries per-field evidence,
+            which the generic result has no equivalent for. */}
+        <AnimatePresence>
+          {adviceVerdict && (
+            <motion.section
+              className={`verdict tone-${
+                adviceVerdict.status === "GENUINE"
+                  ? "ok"
+                  : adviceVerdict.status === "ALTERED"
+                    ? "warn"
+                    : adviceVerdict.status === "NOT_ISSUED"
+                      ? "bad"
+                      : "dim"
+              }`}
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4, ease: EASE_OUT }}
+            >
+              <div className="verdict-head">
+                {adviceVerdict.status === "GENUINE" ? (
+                  <CheckCircle2 size={30} aria-hidden="true" />
+                ) : adviceVerdict.status === "ALTERED" ? (
+                  <AlertTriangle size={30} aria-hidden="true" />
+                ) : (
+                  <XCircle size={30} aria-hidden="true" />
+                )}
+                <div>
+                  <strong>{adviceVerdict.headline}</strong>
+                  <code>{adviceVerdict.status}</code>
+                </div>
+              </div>
+              <p className="verdict-plain">{adviceVerdict.detail}</p>
+
+              {adviceVerdict.fields.length > 0 && (
+                <div className="table-wrap">
+                  <table className="field-check">
+                    <thead>
+                      <tr><th>Field</th><th>Issued as</th><th>Printed now</th></tr>
+                    </thead>
+                    <tbody>
+                      {adviceVerdict.fields.map((check) => (
+                        <tr key={check.name} className={check.matched ? undefined : "mismatch"}>
+                          <td>{check.name.replace(/_/g, " ")}</td>
+                          <td className="mono">{check.expected}</td>
+                          <td className="mono">{check.read}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </motion.section>
+          )}
+        </AnimatePresence>
 
         <AnimatePresence>
           {verdict && result && (

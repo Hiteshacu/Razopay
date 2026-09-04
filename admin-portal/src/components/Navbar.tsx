@@ -1,8 +1,8 @@
-import { FileSignature, KeyRound, LayoutDashboard, ListChecks, ReceiptText, ScrollText, ShieldCheck, UserCheck, Users2 } from "lucide-react";
+import { Banknote, FileSignature, KeyRound, LayoutDashboard, ListChecks, ReceiptText, ScrollText, ShieldCheck, UserCheck, Users2 } from "lucide-react";
 import { motion } from "motion/react";
 import type { ComponentType } from "react";
 
-type View = "dashboard" | "authorities" | "keys" | "sign" | "advice" | "documents" | "audit" | "approvals" | "users";
+type View = "dashboard" | "authorities" | "keys" | "sign" | "issue" | "advice" | "documents" | "audit" | "approvals" | "users";
 
 type Role = "owner" | "admin" | "member";
 
@@ -11,7 +11,10 @@ const items: Array<{ id: View; label: string; icon: ComponentType<{ size?: numbe
   { id: "authorities", label: "Authorities", icon: ShieldCheck },
   { id: "keys", label: "Keys", icon: KeyRound },
   { id: "sign", label: "Sign", icon: FileSignature },
-  { id: "advice", label: "Payout advice", icon: ReceiptText },
+  // The two halves of the payout story, in the order they happen:
+  // RazorpayX issues one, a vendor checks the one they were sent.
+  { id: "issue", label: "Issue a payout", icon: Banknote },
+  { id: "advice", label: "Check a payout", icon: ReceiptText },
   { id: "documents", label: "Documents", icon: ListChecks },
   { id: "audit", label: "Audit", icon: ScrollText },
   { id: "approvals", label: "Approvals", icon: UserCheck, adminOnly: true },

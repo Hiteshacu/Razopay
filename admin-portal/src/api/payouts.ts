@@ -48,12 +48,42 @@ export function adviceImageUrl(payoutId: string): string {
   return `${base}/api/payout-advice/image/${payoutId}`;
 }
 
-export async function issueAdvice(): Promise<IssuedAdvice> {
-  const { data } = await client.post<IssuedAdvice>(
-    "/api/payout-advice/issue",
-    new FormData()
-  );
+export type AdviceRequest = {
+  /** Rupees, as typed. Commas and a rupee sign are tolerated by the server. */
+  amount?: string;
+  beneficiary?: string;
+  mode?: string;
+};
+
+/**
+ * Issue a signed advice.
+ *
+ * Anything left out is filled from a seeded sample, so naming only the amount
+ * still produces a complete document — a half-filled advice would not be a
+ * fair test of a reader that has to find every field.
+ */
+export async function issueAdvice(request: AdviceRequest = {}): Promise<IssuedAdvice> {
+  const form = new FormData();
+  if (request.amount) form.append("amount", request.amount);
+  if (request.beneficiary) form.append("beneficiary", request.beneficiary);
+  if (request.mode) form.append("mode", request.mode);
+  const { data } = await client.post<IssuedAdvice>("/api/payout-advice/issue", form);
   return data;
+}
+
+/** Download an issued advice as a file, rather than opening it in a tab. */
+export async function downloadAdvice(payoutId: string): Promise<void> {
+  const response = await client.get(`/api/payout-advice/image/${payoutId}`, {
+    responseType: "blob"
+  });
+  const href = URL.createObjectURL(response.data as Blob);
+  const anchor = window.document.createElement("a");
+  anchor.href = href;
+  anchor.download = `${payoutId}.png`;
+  window.document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(href);
 }
 
 export async function verifyAdvice(file: File, payoutId: string): Promise<AdviceVerdict> {
