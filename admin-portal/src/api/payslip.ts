@@ -38,7 +38,6 @@ export type IssuedPayslip = {
  * and re-exporting keeps the verdict renderer able to take either without a
  * cast, and means a change to one cannot silently diverge from the other.
  */
-export type { FieldCheck as SlipFieldCheck } from "./payouts";
 export type { AdviceVerdict as PayslipVerdict } from "./payouts";
 
 export type PayslipRequest = {

@@ -865,21 +865,102 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   justify-self: center;
 }
 
-/* ---- per-field evidence ---- */
+/* ---- RazorpayX mode switch ---- */
 
-.field-check { width: 100%; font-size: var(--t-sm); }
-.field-check td.mono {
-  font-family: var(--f-mono, ui-monospace, "SF Mono", Consolas, monospace);
-  font-size: 12.5px;
-  overflow-wrap: anywhere;
+.rzp-switch {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: var(--space-4);
 }
-/* The row that carries the finding, marked by more than colour so it survives
-   a greyscale print and a reader who cannot separate red from green. */
-.field-check tr.mismatch { background: var(--danger-wash); }
-.field-check tr.mismatch td { color: var(--danger); font-weight: 700; }
-.field-check tr.mismatch td:first-child::before {
-  content: "0 a0";
-  font-weight: 800;
+.rzp-switch label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3);
+  cursor: pointer;
+  margin: 0;
+}
+/* The checkbox stays in the accessibility tree and keeps its own focus ring;
+   the track is only paint. Replacing it with a div would have cost keyboard
+   operation for a rounded rectangle. */
+.rzp-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.rzp-track {
+  width: 40px;
+  height: 23px;
+  border-radius: var(--r-pill);
+  background: var(--surface-sunk);
+  border: 1px solid var(--line);
+  position: relative;
+  transition: background 0.18s ease, border-color 0.18s ease;
+  margin-top: 2px;
+}
+.rzp-track i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.18s ease;
+}
+.rzp-switch input:checked + .rzp-track {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.rzp-switch input:checked + .rzp-track i { transform: translateX(17px); }
+.rzp-switch input:focus-visible + .rzp-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.rzp-label { display: grid; gap: 3px; min-width: 0; }
+.rzp-label strong { color: var(--ink); }
+.rzp-label small { color: var(--ink-3); font-size: var(--t-sm); line-height: 1.55; }
+
+/* ---- where the page was edited ---- */
+
+.damage-figure { margin: 0; display: grid; gap: var(--space-2); }
+
+/* The box is positioned against this, so it has to be exactly the size of the
+   rendered image — hence the inline-grid rather than a block that would
+   stretch to the panel and put the highlight in the wrong place. */
+.damage-frame {
+  position: relative;
+  display: inline-grid;
+  justify-self: center;
+  max-width: 100%;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.damage-frame img { display: block; max-width: 100%; height: auto; }
+
+/* Warn rather than danger. The box says "look here", not "this is the
+   forgery" — the peak is where the carrier is most damaged, which is where an
+   edit lands but is not itself the verdict. */
+.damage-box {
+  position: absolute;
+  border: 2px solid #9a5b06;
+  border-radius: 3px;
+  box-shadow: 0 0 0 9999px rgba(2, 4, 43, 0.42);
+  pointer-events: none;
+}
+
+.damage-figure figcaption {
+  font-size: var(--t-sm);
+  color: var(--ink-3);
+  line-height: 1.55;
+  text-align: center;
+  max-width: 52ch;
+  justify-self: center;
 }
 
 /* ---- payout counterfoil ---- */

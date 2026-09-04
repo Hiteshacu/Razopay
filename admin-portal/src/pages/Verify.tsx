@@ -100,7 +100,6 @@ export function Verify({ onBack }: { onBack: () => void }) {
   // when they were issued — so they share the verdict shape and differ only
   // in which endpoint holds the record and which key signed it.
   const [payslipMode, setPayslipMode] = useState(false);
-  const [payoutId, setPayoutId] = useState("");
   const [adviceVerdict, setAdviceVerdict] = useState<AdviceVerdict | null>(null);
   // The uploaded file's own pixel dimensions. The region comes back in those,
   // and the preview is displayed at whatever width fits, so the box has to be
@@ -156,23 +155,20 @@ export function Verify({ onBack }: { onBack: () => void }) {
     setResult(null);
     setAdviceVerdict(null);
     setFailed("");
-    // An issued advice downloads as <payout_id>.png, so the id is usually
-    // already in the reader's hand. Filling it saves them copying a string
-    // off the page, and it stays editable because a file can be renamed.
-    const stem = (next?.name ?? "").replace(/\.[^.]+$/, "");
-    if (/^[A-Za-z0-9_]{6,}$/.test(stem)) setPayoutId(stem);
   }
 
   async function runAdvice() {
-    if (!file || !payoutId.trim()) return;
+    if (!file) return;
     setBusy(true);
     setResult(null);
     setAdviceVerdict(null);
     setFailed("");
     try {
-      const id = payoutId.trim();
+      // No id: the answer comes out of the file, so there is nothing to look
+      // it up by. The parameter is still accepted by the API for older
+      // clients, and left empty here.
       setAdviceVerdict(
-        payslipMode ? await verifyPayslip(file, id) : await verifyAdvice(file, id)
+        payslipMode ? await verifyPayslip(file, "") : await verifyAdvice(file, "")
       );
     } catch (exc) {
       const detail = (exc as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -317,30 +313,11 @@ export function Verify({ onBack }: { onBack: () => void }) {
           </button>
         </section>
 
-        {(razorpayMode || payslipMode) && (
-          <section className="panel">
-            <h2><span className="vstep">2</span> {payslipMode ? "Which payslip?" : "Which payout?"}</h2>
-            <p className="hint no-top">
-              The id printed on the document. One downloaded from the console is
-              named after it, so choosing the file usually fills this in.
-            </p>
-            <input
-              className="verify-input"
-              type="text"
-              value={payoutId}
-              placeholder={payslipMode ? "e.g. slip_7K2QM4XZ9AB1CD" : "e.g. pout_4f2c9a1b"}
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => setPayoutId(event.target.value)}
-            />
-          </section>
-        )}
-
-        {/* Both steps belong to the generic path only: in RazorpayX mode
-            the key is RazorpayX's own and there is nothing to pick. */}
+        {/* Both steps belong to the generic path only. In either RazorpayX
+            mode the key is known, and nothing is looked up — so there is no
+            signer to name and no id to supply. */}
         {!razorpayMode && !payslipMode && (
           <>
-          {/* ---- 2. who signed it ---- */}
           <section className="panel">
             <h2><span className="vstep">2</span> Who signed it?</h2>
             <p className="hint no-top">
@@ -400,9 +377,7 @@ export function Verify({ onBack }: { onBack: () => void }) {
 
         <motion.button
           className="primary-button lg verify-go"
-          disabled={
-            busy || !file || (razorpayMode || payslipMode ? !payoutId.trim() : !selectedKeyId)
-          }
+          disabled={busy || !file || (razorpayMode || payslipMode ? false : !selectedKeyId)}
           onClick={razorpayMode || payslipMode ? runAdvice : run}
           whileHover={reduceMotion || busy ? undefined : { y: -1 }}
           whileTap={reduceMotion || busy ? undefined : { scale: 0.99 }}
@@ -464,24 +439,28 @@ export function Verify({ onBack }: { onBack: () => void }) {
               </div>
               <p className="verdict-plain">{adviceVerdict.detail}</p>
 
-              {adviceVerdict.fields.length > 0 && (
-                <div className="table-wrap">
-                  <table className="field-check">
-                    <thead>
-                      <tr><th>Field</th><th>Issued as</th><th>Printed now</th></tr>
-                    </thead>
-                    <tbody>
-                      {adviceVerdict.fields.map((check) => (
-                        <tr key={check.name} className={check.matched ? undefined : "mismatch"}>
-                          <td>{check.name.replace(/_/g, " ")}</td>
-                          <td className="mono">{check.expected}</td>
-                          <td className="mono">{check.read}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              {/* Where, drawn on the page itself. Nothing was compared
+                  against a record — the tear in the carrier is read out of
+                  the pixels, so the highlight is the evidence rather than a
+                  row in a table quoting a database. */}
+              {preview && adviceVerdict.status === "ALTERED" && adviceVerdict.region && (
+                <figure className="damage-figure">
+                  <div className="damage-frame">
+                    <img src={preview} alt="" />
+                    <span
+                      className="damage-box"
+                      style={{
+                        left: `${(adviceVerdict.region.left / adviceVerdict.image_width) * 100}%`,
+                        top: `${(adviceVerdict.region.top / adviceVerdict.image_height) * 100}%`,
+                        width: `${((adviceVerdict.region.right - adviceVerdict.region.left) / adviceVerdict.image_width) * 100}%`,
+                        height: `${((adviceVerdict.region.bottom - adviceVerdict.region.top) / adviceVerdict.image_height) * 100}%`
+                      }}
+                    />
+                  </div>
+                  <figcaption>This part of the page was changed after it was signed.</figcaption>
+                </figure>
               )}
+
             </motion.section>
           )}
         </AnimatePresence>

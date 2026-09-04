@@ -46,43 +46,6 @@ router = APIRouter(prefix="/api/payout-advice", tags=["payout-advice"])
 _DEMO_DIR = settings.local_upload_root / "payout_demo"
 
 
-def _record_key(kind: str, doc_id: str) -> str:
-    return f"{kind}:{doc_id}"
-
-
-def _save_issue_record(kind: str, issued) -> None:
-    """Keep the issued record somewhere a redeploy cannot reach.
-
-    It was written next to the image under the upload root, which on this host
-    is the container filesystem — nothing is mounted at /data, because keys and
-    the registry were moved to Firestore instead of a volume. So every deploy
-    erased every issued record, and checking a document handed out yesterday
-    answered "no advice was issued with that id", about one that was.
-
-    Firestore, alongside everything else this service cannot afford to lose.
-    """
-    try:
-        FirebaseService().create_document(
-            "issued_records",
-            _record_key(kind, issued.payout_id),
-            {"kind": kind, "doc_id": issued.payout_id, "printed": issued.printed},
-        )
-    except Exception as exc:  # pragma: no cover - the document still exists
-        print(f"WARNING: issued record {issued.payout_id} not persisted: {exc}", flush=True)
-
-
-def _load_issue_record(kind: str, doc_id: str) -> dict | None:
-    """The printed values for one issued document, or None if unknown."""
-    try:
-        record = FirebaseService().get_document("issued_records", _record_key(kind, doc_id))
-    except Exception:
-        return None
-    if not record:
-        return None
-    printed = record.get("printed")
-    return printed if isinstance(printed, dict) else None
-
-
 def _keys() -> tuple[Path, Path]:
     _DEMO_DIR.mkdir(parents=True, exist_ok=True)
     private, public = _DEMO_DIR / "priv.pem", _DEMO_DIR / "pub.pem"
@@ -230,7 +193,6 @@ async def issue_advice(
 
         issued = issue(advice, _DEMO_DIR / "issued",
                        private_key=private, public_key=public, seed=chosen)
-        _save_issue_record("advice", issued)
         document_id = _record_issued(issued, advice, caller)
         return {
             "payout_id": issued.payout_id,
@@ -266,28 +228,93 @@ async def advice_image(payout_id: str):
                         filename=f"{safe}.png")
 
 
+def _check_from_signature(upload: Path, public_pem: Path, label: str) -> dict:
+    """Decide from the proof in the pixels, and nothing else.
+
+    No record is consulted, and none is needed. The signature says whether
+    RazorpayX issued this page; the carrier woven through it says whether the
+    page was edited afterwards and where. Both are read out of the file in
+    hand, so a document issued a year ago on a service that has been redeployed
+    since is answered exactly as well as one issued a minute ago.
+
+    Comparing printed values against a stored record is the other way to do
+    this, and it was how this endpoint worked. It reads more precisely — it can
+    name the field and quote both values — but it is only as durable as the
+    record, and it makes verification a question about a database rather than
+    about the document. A reader holding a suspicious page should not be told
+    "no advice was issued with that id" because a deploy erased a file.
+    """
+    from utils import read_image
+
+    from razorpayx.locate import inspect_carrier
+    from verify_poster import verify_poster
+
+    image = read_image(upload)
+    finding = inspect_carrier(image)
+
+    region = None
+    if finding.region is not None:
+        region = {
+            "left": finding.region.left,
+            "top": finding.region.top,
+            "right": finding.region.right,
+            "bottom": finding.region.bottom,
+            "peak_x": finding.region.peak_x,
+            "peak_y": finding.region.peak_y,
+        }
+
+    try:
+        outcome = verify_poster(upload, public_key_path=public_pem, audit=False)
+        signed_ok = outcome[0] if isinstance(outcome, tuple) else bool(outcome)
+        engine_message = ""
+    except Exception as exc:
+        signed_ok, engine_message = False, str(exc).lower()
+
+    height, width = image.shape[:2]
+    base = {"image_width": int(width), "image_height": int(height),
+            "measurable": finding.measurable, "blob": finding.blob,
+            "region": region}
+
+    # The carrier is torn in one place: an edit the page fingerprint's
+    # tolerance is wide enough to absorb, which is the case it is blind to.
+    if finding.edited:
+        return {**base, "status": "ALTERED",
+                "headline": f"Issued by RazorpayX, then edited",
+                "detail": (f"The signature is real — RazorpayX did issue this {label}. "
+                           "But the proof woven through the page is torn in one "
+                           "region, which means that part was changed afterwards. "
+                           "Do not release goods against this document.")}
+
+    if signed_ok:
+        return {**base, "status": "GENUINE", "headline": "Genuine",
+                "detail": (f"RazorpayX issued this {label}, and the proof woven "
+                           "through the page is intact everywhere. Note that NEFT "
+                           "and RTGS settle in batches, so the credit may not have "
+                           "reached the account yet.")}
+
+    if "fingerprint" in engine_message:
+        return {**base, "status": "ALTERED", "headline": "Issued by RazorpayX, then edited",
+                "detail": (f"The signature is real — RazorpayX did issue this {label} "
+                           "— but the page no longer matches what was signed.")}
+
+    return {**base, "status": "NOT_ISSUED", "headline": "No RazorpayX signature found",
+            "detail": (f"This image carries no embedded proof. RazorpayX did not "
+                       f"issue this {label}, or it has been damaged past recovery: "
+                       "a heavy crop, or a photograph of a screen.")}
+
+
 @router.post("/verify")
 async def verify_advice(
     file: UploadFile = File(...),
-    payout_id: str = Form(...),
+    payout_id: str | None = Form(None),
 ):
-    """Check an uploaded advice against the record kept when it was issued."""
+    """Check an uploaded advice from its signature alone.
+
+    The id is accepted and ignored. It was required when the answer came from
+    comparing against a stored record; it is kept so an older client does not
+    break, and so a reader who has one is not told their input is invalid.
+    """
     import tempfile
-
-    from utils import read_image
-
-    from razorpayx.check import check
-    from razorpayx.issue import load_record
-
-    safe = "".join(ch for ch in payout_id if ch.isalnum() or ch == "_")
-    # Firestore first: the file beside the image does not survive a deploy.
-    printed = _load_issue_record("advice", safe)
-    record_path = _DEMO_DIR / "issued" / f"{safe}.json"
-    if printed is None and not record_path.is_file():
-        raise HTTPException(
-            status_code=404,
-            detail="No advice was issued with that payout id in this demo.",
-        )
 
     suffix = Path(file.filename or "upload.png").suffix.lower() or ".png"
     if suffix not in {".png", ".jpg", ".jpeg"}:
@@ -298,26 +325,8 @@ async def verify_advice(
         upload = Path(handle.name)
 
     try:
-        values = printed if printed is not None else load_record(record_path).printed
         _, public = _keys()
-        verdict = check(read_image(upload), upload, values,
-                        public.read_text(encoding="utf-8"))
-        return {
-            "status": verdict.status,
-            "headline": verdict.headline,
-            "detail": verdict.detail,
-            "watermark_ok": verdict.watermark_ok,
-            "fields": [
-                {
-                    "name": f.name,
-                    "expected": f.expected,
-                    "read": f.read,
-                    "matched": f.matched,
-                    "confidence": round(f.confidence, 3),
-                }
-                for f in verdict.findings
-            ],
-        }
+        return _check_from_signature(upload, public, "advice")
     except HTTPException:
         raise
     except Exception as exc:

@@ -43,20 +43,26 @@ export type IssuedAdvice = {
   image_url: string;
 };
 
-export type FieldCheck = {
-  name: string;
-  expected: string;
-  read: string;
-  matched: boolean;
-  confidence: number;
-};
-
 export type AdviceVerdict = {
   status: "GENUINE" | "ALTERED" | "NOT_ISSUED" | "WRONG_KEY" | "UNREADABLE";
   headline: string;
   detail: string;
-  watermark_ok: boolean;
-  fields: FieldCheck[];
+  /** Pixels of the file that was uploaded, so a region can be drawn on it. */
+  image_width: number;
+  image_height: number;
+  /** False when the payload could not be read back — no claim either way. */
+  measurable: boolean;
+  /** Largest torn patch of carrier, in blocks. */
+  blob: number;
+  /** Where the tear is. Present when there is a carrier to read. */
+  region?: {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    peak_x: number;
+    peak_y: number;
+  } | null;
 };
 
 export function adviceImageUrl(payoutId: string): string {
