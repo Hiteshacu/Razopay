@@ -63,49 +63,51 @@ class VerificationService:
         return "ERROR", message
 
     @staticmethod
-    def _damaged_region(upload_path: Path) -> dict | None:
-        """Where the carrier disagrees with the payload it still holds.
+    def _inspect_carrier(upload_path: Path) -> dict | None:
+        """What the carrier says about this page, on its own.
 
-        Read from the signature alone. The payload survives locally destroyed
-        blocks because it is repeated across the page and majority-voted, so it
-        can be recovered from an edited document and then every block asked
-        whether it still agrees. Repainting a figure disagrees in a contiguous
-        patch; recompression disagrees thinly, everywhere.
+        Read from the signature alone — the payload is recovered from the
+        image in hand, so nothing is compared against any stored record.
 
-        Only ever attached to a verdict already reached. Measured on the
-        evaluation corpus, this signal cannot decide on its own — an honest
-        photograph of a screen concentrates damage 20x above its own mean and
-        the weakest forgery 14x, so used as a detector it would call honest
-        copies forged. Used as a pointer, after the fingerprint has already
-        said the page changed, it is an argmax with no threshold to be wrong
-        about, and it put the peak on a repainted field in 30 of 30 forgeries.
+        This catches what the fingerprint cannot. The fingerprint is 128 bits
+        of whole-page structure and the tolerance that carries it through a
+        messaging app also absorbs a repainted figure: a measured 4.1% edit
+        passed as authentic on one page and was caught on another, because
+        size is not what decides. The carrier is per-block, so an edit shows
+        as a contiguous patch of disagreement where recompression shows as
+        thin scatter.
 
-        Never allowed to fail a verification: a missing highlight is worth less
-        than the answer it would have decorated.
+        Never allowed to fail a verification.
         """
         try:
             import sys as _sys
 
-            # The engine and razorpayx both live at the repository root. The
-            # adapter normally puts it on the path, but this must not depend on
-            # another module having been imported first.
             root = str(Path(__file__).resolve().parents[3])
             if root not in _sys.path:
                 _sys.path.insert(0, root)
-            from razorpayx.locate import locate_in_file
+            from razorpayx.locate import EDIT_BLOB_THRESHOLD, inspect_carrier
 
-            region = locate_in_file(upload_path)
-            if region is None:
-                return None
-            return {
-                "left": region.left,
-                "top": region.top,
-                "right": region.right,
-                "bottom": region.bottom,
-                "peak_x": region.peak_x,
-                "peak_y": region.peak_y,
-                "concentration": round(region.concentration, 2),
+            from utils import read_image
+
+            finding = inspect_carrier(read_image(upload_path))
+            payload = {
+                "measurable": finding.measurable,
+                "edited": finding.edited,
+                "blob": finding.blob,
+                "threshold": EDIT_BLOB_THRESHOLD,
+                "background_rate": round(finding.background_rate, 4),
             }
+            if finding.region is not None:
+                payload["damaged_region"] = {
+                    "left": finding.region.left,
+                    "top": finding.region.top,
+                    "right": finding.region.right,
+                    "bottom": finding.region.bottom,
+                    "peak_x": finding.region.peak_x,
+                    "peak_y": finding.region.peak_y,
+                    "concentration": round(finding.region.concentration, 2),
+                }
+            return payload
         except Exception:
             return None
 
@@ -121,13 +123,35 @@ class VerificationService:
             public_key_path = Path(key_file.name)
         try:
             result = verify_file_adapter(upload_path, public_key_path)
+            carrier = self._inspect_carrier(upload_path)
             if result["valid"]:
-                details = result.get("details", {})
+                details = dict(result.get("details", {}))
+                if carrier:
+                    details["carrier"] = carrier
                 if selected_key_id and selected_key_id != key_id:
                     details = {
                         **details,
                         "auto_detected_key": True,
                         "selected_key_id": selected_key_id,
+                    }
+
+                # The signature is genuine and the fingerprint still matches,
+                # but the carrier is torn in one place. That is an edit small
+                # enough for the fingerprint's tolerance to absorb, which is
+                # exactly the case it was blind to, so the carrier overrules.
+                if carrier and carrier.get("edited"):
+                    return {
+                        "success": False,
+                        "result": "TAMPERED",
+                        "reason": (
+                            "The signature is genuine, but the proof woven through "
+                            "the page is torn in one region — that part was edited "
+                            "after signing."
+                        ),
+                        "authority_name": key.get("authority_name"),
+                        "authority_id": key.get("authority_id"),
+                        "key_id": key_id,
+                        "details": details,
                     }
                 return {
                     "success": True,
@@ -143,9 +167,8 @@ class VerificationService:
             # against here, and that is the point: the signature travels with
             # the document and a stored record does not.
             tampered_details = dict(result.get("details", {}))
-            region = self._damaged_region(upload_path)
-            if region:
-                tampered_details["damaged_region"] = region
+            if carrier:
+                tampered_details["carrier"] = carrier
             return {
                 "success": False,
                 "result": "TAMPERED",

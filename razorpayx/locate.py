@@ -1,25 +1,33 @@
-"""Point at the part of the page that was edited.
+"""Read the carrier back, and ask it whether the page was edited and where.
 
-Deliberately separate from the decision. `check` already says whether an
-advice was altered, at full recall, by reading the printed characters and
-comparing them to the record. This module is never asked that question, and
-the distinction is what makes it work.
+The signal is the carrier itself. Every 8x8 block holds one bit of a payload
+that survives locally destroyed blocks, because it is repeated across the page
+and majority-voted. So the payload can be recovered from a damaged page, and
+every block then asked whether it still agrees with what was recovered.
+Recompression disagrees thinly and independently, everywhere. An edit destroys
+a contiguous patch.
 
-Detection needs a threshold no honest copy ever crosses. Measured on the
-evaluation corpus, no such threshold exists for this signal: a photo of a
-screen concentrates carrier damage 22x above its own mean, while the weakest
-forgery concentrates it 13x. Used as a detector it would call honest
-photographs forgeries. Used as a pointer, given that something is already
-known to be wrong, it is an argmax over the page, and an argmax has no
-threshold to be wrong about. On the same corpus it put the peak on a repainted
-field in 30 of 30 forgeries, including the single changed digit.
+Which statistic is asked matters more than it looks, and the first one tried
+was the wrong one. Peak local density over the page's own mean — an amplitude
+— does not separate: a photograph of a screen concentrates damage 22x and the
+weakest forgery 13x, so a detector built on it would call honest photographs
+forged. That measurement stands, and is why `locate` is a pointer that never
+decides anything.
 
-The signal is the carrier. Every 8x8 block holds one bit of the payload, and
-the payload survives locally destroyed blocks because it is repeated across
-the page and majority-voted. So the payload can still be recovered from an
-edited page, and every block can then be asked whether it still agrees with
-what was recovered. Repainting a field destroys the carrier in a contiguous
-patch. Recompression damages it thinly, everywhere.
+The difference between an edit and recompression is not amplitude but shape,
+and the largest connected patch measures shape. Over 48 honest journeys and 32
+edits, honest pages produced a blob of 0 or exactly 4 and never more, while
+edits produced 6 to 27. Four is structural rather than lucky: after a 2x2
+opening the smallest surviving component is one 2x2 block, so an honest page
+holds at most one isolated cluster and an edit leaves a real patch. That is
+what `inspect_carrier` decides on, and it is the only thing in this module
+allowed to decide anything.
+
+What it cannot do is read a page whose payload will not come back — a heavy
+downscale, or a messaging-app re-encode, where recovery needs the registry
+rather than a direct read. Those return measurable=False and make no claim,
+because a detector that reports "I could not look" as "nothing is wrong" is
+worse than one that declines to answer.
 """
 
 from __future__ import annotations
@@ -137,6 +145,89 @@ def payload_bits_for(image: np.ndarray) -> np.ndarray | None:
         return None
     payload = u.build_watermark_payload(u.signature_from_base64(signature_b64), fingerprint)
     return u.bytes_to_bits(payload)
+
+
+#: Largest connected patch of disagreeing carrier blocks, after a 2x2 opening,
+#: above which a page is called edited.
+#:
+#: Measured over 48 honest journeys and 32 edits on rendered advices. Honest
+#: pages produced a blob of 0 (30 times) or exactly 4 (18 times) and never
+#: more; edits produced 6 to 27. Four is not a coincidence — the opening's
+#: smallest surviving component is one 2x2 block, so an honest page has at
+#: most one isolated cluster, while an edit leaves a patch.
+#:
+#: Set at the observed floor of the edited range rather than midway. The two
+#: errors are not equal: missing a smaller edit costs one consignment of
+#: goods, and calling an honest payer's advice forged costs them the customer
+#: they were trying to pay. The margin belongs on the honest side.
+EDIT_BLOB_THRESHOLD = 6
+
+
+@dataclass(frozen=True)
+class CarrierFinding:
+    """What the carrier's own error pattern says about a page."""
+
+    #: Whether the payload could be recovered at all. False means no claim is
+    #: being made — not that the page is clean.
+    measurable: bool
+    #: Largest connected patch of disagreeing blocks, after opening.
+    blob: int
+    #: Fraction of carrier blocks disagreeing across the whole page.
+    background_rate: float
+    #: Where that patch is, when there is one.
+    region: Region | None
+
+    @property
+    def edited(self) -> bool:
+        return self.measurable and self.blob >= EDIT_BLOB_THRESHOLD
+
+
+def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFinding:
+    """Ask the carrier whether this page was edited, and where.
+
+    This is the question the whole-page fingerprint cannot answer. That
+    fingerprint is 128 bits of global structure and its tolerance — the thing
+    that lets a signature survive a messaging app — is the same tolerance that
+    absorbs a repainted figure: a measured 4.1% edit passed as authentic on one
+    page and was caught on another, because size is not what decides.
+
+    The carrier is a different signal and answers a different question. Every
+    8x8 block holds one bit of a payload that survives locally destroyed blocks
+    because it is repeated and majority-voted, so the payload is recovered from
+    the damaged page and every block asked whether it still agrees.
+    Recompression disagrees thinly and independently. An edit destroys a
+    contiguous patch. That is a difference of shape, not of amount, which is
+    why measuring amplitude — peak density over the mean — did not separate
+    them and measuring the largest connected patch does.
+
+    A payload that cannot be recovered returns measurable=False. That happens
+    for a heavy downscale or a messaging-app re-encode, where recovery needs
+    the registry rather than a direct read. No claim is made there, because a
+    detector that treats "I could not look" as "I saw nothing wrong" is worse
+    than one that declines.
+    """
+    bits = payload_bits_for(image)
+    if bits is None:
+        return CarrierFinding(measurable=False, blob=0, background_rate=0.0, region=None)
+
+    grid = disagreement_map(image, bits)
+    if grid.size == 0:
+        return CarrierFinding(measurable=False, blob=0, background_rate=0.0, region=None)
+
+    background = float(grid.mean())
+    binary = (grid > 0.5).astype(np.uint8)
+    # Opening drops lone blocks and keeps solid patches, which is the whole
+    # distinction being measured.
+    opened = cv2.morphologyEx(binary, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    count, _, stats, _ = cv2.connectedComponentsWithStats(opened, connectivity=8)
+    blob = int(stats[1:, cv2.CC_STAT_AREA].max()) if count > 1 else 0
+
+    return CarrierFinding(
+        measurable=True,
+        blob=blob,
+        background_rate=background,
+        region=locate(image, bits, window=window),
+    )
 
 
 def locate_in_file(path: str | Path, *, window: int = WINDOW) -> Region | None:

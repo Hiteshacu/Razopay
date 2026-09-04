@@ -41,20 +41,28 @@ export type VerifyResult = {
     auto_detected_key?: boolean;
     selected_key_id?: string;
     /**
-     * Where the carrier is most damaged, in the pixels of the file uploaded.
+     * What the proof woven through the page says about it, on its own.
      *
-     * Present only on TAMPERED. The signal cannot decide on its own — an
-     * untouched page has a peak too, it is just meaningless — so it is shown
-     * as evidence for a verdict already reached, never as the reason for one.
+     * `measurable` false means the payload could not be read back directly —
+     * a heavy downscale or a messaging-app re-encode — and no claim is being
+     * made either way. `blob` is the largest torn patch of carrier; at or
+     * above `threshold` the page was edited after signing.
      */
-    damaged_region?: {
-      left: number;
-      top: number;
-      right: number;
-      bottom: number;
-      peak_x: number;
-      peak_y: number;
-      concentration: number;
+    carrier?: {
+      measurable: boolean;
+      edited: boolean;
+      blob: number;
+      threshold: number;
+      background_rate: number;
+      damaged_region?: {
+        left: number;
+        top: number;
+        right: number;
+        bottom: number;
+        peak_x: number;
+        peak_y: number;
+        concentration: number;
+      };
     };
     [key: string]: unknown;
   };

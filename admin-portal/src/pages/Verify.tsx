@@ -508,23 +508,24 @@ export function Verify({ onBack }: { onBack: () => void }) {
                   Percentages rather than pixels: the preview is scaled to fit,
                   and a box positioned in the original's pixel space would sit
                   somewhere else entirely on a 1000px page shown at 460. */}
-              {preview && result.details?.damaged_region && (
+              {preview && result.details?.carrier?.damaged_region && (
                 <figure className="damage-figure">
                   <div className="damage-frame">
                     <img src={preview} alt="" />
                     <span
                       className="damage-box"
                       style={{
-                        left: `${(result.details.damaged_region.left / naturalSize.w) * 100}%`,
-                        top: `${(result.details.damaged_region.top / naturalSize.h) * 100}%`,
-                        width: `${((result.details.damaged_region.right - result.details.damaged_region.left) / naturalSize.w) * 100}%`,
-                        height: `${((result.details.damaged_region.bottom - result.details.damaged_region.top) / naturalSize.h) * 100}%`
+                        left: `${(result.details.carrier!.damaged_region!.left / naturalSize.w) * 100}%`,
+                        top: `${(result.details.carrier!.damaged_region!.top / naturalSize.h) * 100}%`,
+                        width: `${((result.details.carrier!.damaged_region!.right - result.details.carrier!.damaged_region!.left) / naturalSize.w) * 100}%`,
+                        height: `${((result.details.carrier!.damaged_region!.bottom - result.details.carrier!.damaged_region!.top) / naturalSize.h) * 100}%`
                       }}
                     />
                   </div>
                   <figcaption>
-                    The signature is damaged most here. Read from the proof in the
-                    pixels, not from any record of what the page used to say.
+                    The proof woven through the page is torn here. Read out of the
+                    pixels themselves — nothing was compared against a record of
+                    what this page used to say.
                   </figcaption>
                 </figure>
               )}
