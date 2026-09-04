@@ -81,12 +81,19 @@ class Field:
     #: read as SUNDAR TDERS. Tracking guarantees a gap. A document meant to be
     #: machine-checked can afford to be set for legibility.
     tracking: int = 0
+    #: The one field printed across the page rather than in the value column.
+    #:
+    #: A flag rather than a name comparison. This used to test for the literal
+    #: "hero_amount", which silently gave the payslip's net pay the narrow
+    #: column geometry and cropped it — a layout deciding where to sample by
+    #: recognising one document's field name cannot be reused by a second.
+    hero: bool = False
 
     @property
     def box(self) -> tuple[int, int, int, int]:
         """The rectangle the reader samples, in canonical coordinates."""
-        left = (LEFT if self.name == "hero_amount" else VALUE_X) + self.value_offset
-        return (left, self.top, RIGHT if self.name != "hero_amount" else 760,
+        left = (LEFT if self.hero else VALUE_X) + self.value_offset
+        return (left, self.top, 760 if self.hero else RIGHT,
                 self.top + self.height)
 
 
@@ -103,7 +110,7 @@ class Field:
 HERO_AMOUNT = Field(
     name="hero_amount", label="", attr="amount_text",
     top=283, height=83, size=52, bold=True,
-    alphabet=MONEY + "Rs", critical=True, tracking=2, numeric=True,
+    alphabet=MONEY + "Rs", critical=True, tracking=2, numeric=True, hero=True,
 )
 
 # 30pt for everything security-critical, 21pt for context that nobody steals.

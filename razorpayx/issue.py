@@ -105,6 +105,52 @@ def issue(
     return issued
 
 
+def issue_payslip(
+    slip,
+    directory: str | Path,
+    *,
+    private_key: str | Path,
+    public_key: str | Path,
+    seed: int = 0,
+):
+    """Render, sign and record one payslip.
+
+    Deliberately a sibling of issue() rather than a generalisation of it. The
+    two share a shape and nothing else: different renderers, different field
+    sets, different identifiers. Folding them into one function parameterised
+    by four callables would read worse than two that each say what they do.
+
+    SIGN_SELF_CHECK is forced to fast for the same reason it is there: the
+    engine's default simulates a messaging round trip before handing back a
+    signed file, which roughly quadruples issuance.
+    """
+    from .payslip import FIELDS as SLIP_FIELDS
+    from .payslip import field_text as slip_field_text
+    from .payslip import render as render_slip
+
+    out = Path(directory)
+    out.mkdir(parents=True, exist_ok=True)
+    unsigned = out / f"{slip.slip_id}_unsigned.png"
+    signed = out / f"{slip.slip_id}.png"
+
+    render_slip(slip, unsigned, seed=seed)
+    signature = _sign(unsigned, signed, Path(private_key), Path(public_key))
+    unsigned.unlink(missing_ok=True)
+
+    printed = {spec.name: slip_field_text(slip, spec) for spec in SLIP_FIELDS}
+    issued = IssuedAdvice(
+        payout_id=slip.slip_id,
+        image_path=signed,
+        printed=printed,
+        signature=signature,
+        issued_at=datetime.now().isoformat(timespec="seconds"),
+    )
+    (out / f"{slip.slip_id}.json").write_text(
+        json.dumps(issued.to_record(), indent=2), encoding="utf-8"
+    )
+    return issued
+
+
 def load_record(path: str | Path) -> IssuedAdvice:
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     data["image_path"] = Path(data["image_path"])

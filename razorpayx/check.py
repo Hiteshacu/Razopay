@@ -133,6 +133,7 @@ def check(
     public_key_pem: str,
     *,
     skip_watermark: bool = False,
+    fields: tuple[Field, ...] = CHECKED,
 ) -> Verdict:
     """Adjudicate one advice against the record RazorpayX kept.
 
@@ -146,7 +147,7 @@ def check(
 
     findings: list[FieldFinding] = []
     unreadable: list[str] = []
-    for spec in CHECKED:
+    for spec in fields:
         expected = printed.get(spec.name, "")
         result = read_field(
             image, spec.box, size=spec.size, bold=spec.bold,
@@ -194,7 +195,7 @@ def check(
             region=_locate_damage(image),
         )
 
-    if len(findings) < len(CHECKED):
+    if len(findings) < len(fields):
         return Verdict(
             UNREADABLE,
             "Signature valid, but this copy is too degraded to check the figures",

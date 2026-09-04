@@ -10,6 +10,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { verifyAdvice, type AdviceVerdict } from "../api/payouts";
+import { verifyPayslip } from "../api/payslip";
 import {
   listPublishedKeys,
   verifyDocument,
@@ -95,6 +96,10 @@ export function Verify({ onBack }: { onBack: () => void }) {
   // sign this file" and needs no key chosen: RazorpayX signs its own advices,
   // so naming a signer would be asking the reader something already known.
   const [razorpayMode, setRazorpayMode] = useState(false);
+  // Payslips are checked the same way advices are — against the record kept
+  // when they were issued — so they share the verdict shape and differ only
+  // in which endpoint holds the record and which key signed it.
+  const [payslipMode, setPayslipMode] = useState(false);
   const [payoutId, setPayoutId] = useState("");
   const [adviceVerdict, setAdviceVerdict] = useState<AdviceVerdict | null>(null);
 
@@ -161,7 +166,10 @@ export function Verify({ onBack }: { onBack: () => void }) {
     setAdviceVerdict(null);
     setFailed("");
     try {
-      setAdviceVerdict(await verifyAdvice(file, payoutId.trim()));
+      const id = payoutId.trim();
+      setAdviceVerdict(
+        payslipMode ? await verifyPayslip(file, id) : await verifyAdvice(file, id)
+      );
     } catch (exc) {
       const detail = (exc as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setFailed(detail ?? "The check could not be completed. Try again.");
@@ -215,7 +223,8 @@ export function Verify({ onBack }: { onBack: () => void }) {
 
         {loadError && <p className="error-text">{loadError}</p>}
 
-        {/* The one switch that changes what question is being asked. */}
+        {/* Two switches, and never both. Each says which record the document
+            is checked against, and a document is one kind or the other. */}
         <div className="rzp-switch">
           <label>
             <input
@@ -223,6 +232,7 @@ export function Verify({ onBack }: { onBack: () => void }) {
               checked={razorpayMode}
               onChange={(event) => {
                 setRazorpayMode(event.target.checked);
+                if (event.target.checked) setPayslipMode(false);
                 setResult(null);
                 setAdviceVerdict(null);
                 setFailed("");
@@ -234,6 +244,30 @@ export function Verify({ onBack }: { onBack: () => void }) {
               <small>
                 Checks it against the record RazorpayX kept when it issued it, using
                 RazorpayX's own key. No signer or key to choose.
+              </small>
+            </span>
+          </label>
+        </div>
+
+        <div className="rzp-switch">
+          <label>
+            <input
+              type="checkbox"
+              checked={payslipMode}
+              onChange={(event) => {
+                setPayslipMode(event.target.checked);
+                if (event.target.checked) setRazorpayMode(false);
+                setResult(null);
+                setAdviceVerdict(null);
+                setFailed("");
+              }}
+            />
+            <span className="rzp-track" aria-hidden="true"><i /></span>
+            <span className="rzp-label">
+              <strong>RazorpayX Payroll payslip</strong>
+              <small>
+                Checks the name, period and salary against what Payroll printed,
+                using Payroll's own key. Nothing to choose here either.
               </small>
             </span>
           </label>
@@ -269,18 +303,18 @@ export function Verify({ onBack }: { onBack: () => void }) {
           </button>
         </section>
 
-        {razorpayMode && (
+        {(razorpayMode || payslipMode) && (
           <section className="panel">
-            <h2><span className="vstep">2</span> Which payout?</h2>
+            <h2><span className="vstep">2</span> {payslipMode ? "Which payslip?" : "Which payout?"}</h2>
             <p className="hint no-top">
-              The payout id printed on the advice. An advice downloaded from the
-              console is named after it, so choosing the file usually fills this in.
+              The id printed on the document. One downloaded from the console is
+              named after it, so choosing the file usually fills this in.
             </p>
             <input
               className="verify-input"
               type="text"
               value={payoutId}
-              placeholder="e.g. pout_4f2c9a1b"
+              placeholder={payslipMode ? "e.g. slip_7K2QM4XZ9AB1CD" : "e.g. pout_4f2c9a1b"}
               autoComplete="off"
               spellCheck={false}
               onChange={(event) => setPayoutId(event.target.value)}
@@ -290,7 +324,7 @@ export function Verify({ onBack }: { onBack: () => void }) {
 
         {/* Both steps belong to the generic path only: in RazorpayX mode
             the key is RazorpayX's own and there is nothing to pick. */}
-        {!razorpayMode && (
+        {!razorpayMode && !payslipMode && (
           <>
           {/* ---- 2. who signed it ---- */}
           <section className="panel">
@@ -352,8 +386,10 @@ export function Verify({ onBack }: { onBack: () => void }) {
 
         <motion.button
           className="primary-button lg verify-go"
-          disabled={busy || !file || (razorpayMode ? !payoutId.trim() : !selectedKeyId)}
-          onClick={razorpayMode ? runAdvice : run}
+          disabled={
+            busy || !file || (razorpayMode || payslipMode ? !payoutId.trim() : !selectedKeyId)
+          }
+          onClick={razorpayMode || payslipMode ? runAdvice : run}
           whileHover={reduceMotion || busy ? undefined : { y: -1 }}
           whileTap={reduceMotion || busy ? undefined : { scale: 0.99 }}
         >
@@ -363,7 +399,13 @@ export function Verify({ onBack }: { onBack: () => void }) {
               <span>Checking the pixels…</span>
             </>
           ) : (
-            <span>{razorpayMode ? "Check this payout advice" : "Verify this document"}</span>
+            <span>
+              {payslipMode
+                ? "Check this payslip"
+                : razorpayMode
+                  ? "Check this payout advice"
+                  : "Verify this document"}
+            </span>
           )}
         </motion.button>
 

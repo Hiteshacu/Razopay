@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import ensure_local_storage_dirs, settings
 from .firebase_client import get_firestore_client, get_storage_bucket
 from .routes import (
-    admin, audit, auth, authorities, chat, documents, keys, payout_advice,
+    admin, audit, auth, authorities, chat, documents, keys, payout_advice, payslip,
     signing, verification,
 )
 
@@ -42,6 +42,7 @@ app.include_router(documents.router)
 app.include_router(audit.router)
 app.include_router(admin.router)
 app.include_router(payout_advice.router)
+app.include_router(payslip.router)
 
 
 @app.on_event("startup")

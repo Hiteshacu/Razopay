@@ -24,7 +24,7 @@ import { KeyManagement } from "./pages/KeyManagement";
 import { Landing } from "./pages/Landing";
 import { Library } from "./pages/Library";
 import { IssuePayout } from "./pages/IssuePayout";
-import { PayoutAdvice } from "./pages/PayoutAdvice";
+import { IssuePayslip } from "./pages/IssuePayslip";
 import { Verify } from "./pages/Verify";
 import { SignDocument } from "./pages/SignDocument";
 import { SignedDocuments } from "./pages/SignedDocuments";
@@ -286,7 +286,7 @@ export default function App() {
         {view === "keys" && <KeyManagement authorities={authorities} keys={keys} onChanged={refresh} />}
         {view === "sign" && <SignDocument authorities={authorities} keys={keys} onSigned={refresh} />}
         {view === "issue" && <IssuePayout />}
-        {view === "advice" && <PayoutAdvice onBack={() => setView("dashboard")} />}
+        {view === "payslip" && <IssuePayslip />}
         {view === "documents" && (
           <SignedDocuments documents={documents} isOwner={approval.role === "owner"} />
         )}
