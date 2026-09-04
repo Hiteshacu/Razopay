@@ -751,6 +751,52 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
 
 .panel h3 { display: flex; align-items: center; gap: 9px; }
 
+/* ---- demo account ---- */
+
+/* A divider that reads as an alternative rather than a second submit: the
+   demo button sits below the form's own action, quieter than it, so the
+   normal path stays the obvious one. */
+.demo-login {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.demo-login > span {
+  position: relative;
+  width: 100%;
+  text-align: center;
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+}
+.demo-login > span::before,
+.demo-login > span::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: calc(50% - 22px);
+  height: 1px;
+  background: var(--line);
+}
+.demo-login > span::before { left: 0; }
+.demo-login > span::after  { right: 0; }
+
+.demo-button { width: 100%; }
+
+.demo-login small {
+  color: var(--ink-3);
+  font-size: var(--t-sm);
+  line-height: 1.55;
+  text-align: center;
+  max-width: 40ch;
+}
+.demo-login small strong {
+  color: var(--ink-2);
+  font-weight: 700;
+}
+
 /* ===================== public verifier ===================== */
 
 .verify-page { min-height: 100vh; background: var(--ground); }

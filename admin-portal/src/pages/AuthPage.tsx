@@ -10,6 +10,24 @@ import { describeAuthError, firebaseAuth, firebaseConfigured } from "../firebase
 
 export type AuthMode = "signin" | "signup";
 
+/**
+ * A shared account anyone may sign in with.
+ *
+ * The password is in the bundle, and there is no way for it not to be: a
+ * credential the page can use without being told it is a credential the page
+ * ships. That is the nature of a demo account rather than a flaw in this one
+ * — it is public on purpose, so a reviewer can sign a document without being
+ * asked to create an account first.
+ *
+ * Two consequences worth being deliberate about. It should stay a plain
+ * member, approved once from the Approvals page rather than seeded through
+ * ADMIN_EMAILS, so it cannot approve other accounts. And the local part is
+ * what the public verifier searches signers by, so anything it signs is found
+ * by typing "default" — which is the point of naming it that.
+ */
+const DEMO_EMAIL = "default@gmail.com";
+const DEMO_PASSWORD = "PayProofDemo2026!";
+
 export function AuthPage({
   mode,
   onModeChange,
@@ -63,6 +81,31 @@ export function AuthPage({
     } catch (exc) {
       const code = (exc as { code?: string })?.code ?? "";
       setError(describeAuthError(code));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function useDemoAccount() {
+    setError("");
+    const auth = firebaseAuth();
+    if (!auth) {
+      setError("Authentication is not configured for this deployment yet.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await signInWithEmailAndPassword(auth, DEMO_EMAIL, DEMO_PASSWORD);
+    } catch (exc) {
+      const code = (exc as { code?: string })?.code ?? "";
+      // The account has to exist in Firebase before this can work, and the
+      // generic "not recognised" wording would send someone hunting for a
+      // typo in a password they never typed.
+      setError(
+        code === "auth/invalid-credential" || code === "auth/user-not-found"
+          ? "The demo account has not been created on this deployment yet."
+          : describeAuthError(code)
+      );
     } finally {
       setBusy(false);
     }
@@ -175,6 +218,24 @@ export function AuthPage({
                 : "Sign in"}
           </motion.button>
         </form>
+
+        <div className="demo-login">
+          <span>or</span>
+          <motion.button
+            type="button"
+            className="ghost-button demo-button"
+            onClick={useDemoAccount}
+            disabled={busy || !firebaseConfigured}
+            whileHover={reduceMotion || busy ? undefined : { y: -1 }}
+            whileTap={reduceMotion || busy ? undefined : { scale: 0.98 }}
+          >
+            Sign in with the demo account
+          </motion.button>
+          <small>
+            Signs in as <strong>{DEMO_EMAIL}</strong>. Anything you sign with it is
+            found in the verifier by searching for <strong>default</strong>.
+          </small>
+        </div>
 
         <p className="auth-switch">
           {signingUp ? "Already have an account?" : "Need an account?"}{" "}

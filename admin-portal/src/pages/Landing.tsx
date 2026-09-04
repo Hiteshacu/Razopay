@@ -39,14 +39,12 @@ export function Landing({
   onSignIn,
   onSignUp,
   onLibrary,
-  onVerify,
-  onPayouts
+  onVerify
 }: {
   onSignIn: () => void;
   onSignUp: () => void;
   onLibrary: () => void;
   onVerify: () => void;
-  onPayouts: () => void;
 }) {
   const reduceMotion = useReducedMotion();
   const [cardsRef, cardsShown] = useReached();
@@ -79,14 +77,6 @@ export function Landing({
             </div>
           </div>
           <nav className="landing-actions">
-            <motion.button
-              className="text-link on-dark nav-link"
-              onClick={onPayouts}
-              whileHover={reduceMotion ? undefined : { y: -1 }}
-              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-            >
-              Check an advice
-            </motion.button>
             <motion.button
               className="text-link on-dark nav-link"
               onClick={onVerify}
@@ -144,7 +134,7 @@ export function Landing({
           <motion.div className="stage-cta" variants={rise} transition={{ duration: 0.55, ease: EASE_OUT }}>
             <motion.button
               className="primary-button lg"
-              onClick={onPayouts}
+              onClick={onSignIn}
               whileHover={reduceMotion ? undefined : { y: -2 }}
               whileTap={reduceMotion ? undefined : { scale: 0.98 }}
             >

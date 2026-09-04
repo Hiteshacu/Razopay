@@ -30,7 +30,7 @@ import { SignedDocuments } from "./pages/SignedDocuments";
 import { MemberActivity } from "./pages/MemberActivity";
 import { Users } from "./pages/Users";
 
-type Screen = "landing" | "auth" | "library" | "verify" | "payouts" | "console";
+type Screen = "landing" | "auth" | "library" | "verify" | "console";
 
 type Approval = { approved: boolean; email: string | null; reason?: string; role: Role } | null;
 
@@ -197,9 +197,6 @@ export default function App() {
     if (screen === "verify") {
       return <Verify onBack={() => setScreen("landing")} />;
     }
-    if (screen === "payouts") {
-      return <PayoutAdvice onBack={() => setScreen("landing")} />;
-    }
     return (
       <Landing
         onSignIn={() => {
@@ -212,7 +209,6 @@ export default function App() {
         }}
         onLibrary={() => setScreen("library")}
         onVerify={() => setScreen("verify")}
-        onPayouts={() => setScreen("payouts")}
       />
     );
   }
@@ -288,6 +284,7 @@ export default function App() {
         {view === "authorities" && <Authorities authorities={authorities} onChanged={refresh} />}
         {view === "keys" && <KeyManagement authorities={authorities} keys={keys} onChanged={refresh} />}
         {view === "sign" && <SignDocument authorities={authorities} keys={keys} onSigned={refresh} />}
+        {view === "advice" && <PayoutAdvice onBack={() => setView("dashboard")} />}
         {view === "documents" && <SignedDocuments documents={documents} />}
         {view === "audit" && <AuditLogs logs={auditLogs} />}
         {/* Guarded here as well as in the sidebar: hiding a link is a
