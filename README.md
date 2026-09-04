@@ -1,190 +1,192 @@
-# Digital Trust Shield
+# PayProof
 
-Digital Trust Shield is a hackathon prototype for verifying whether government posters, payment receipts, notices, PDFs, and shared screenshots are authentic or tampered.
+**Tamper detection for RazorpayX payout advices and payslips.**
+The document proves itself — no database, no lookup, no account.
 
-The public repository intentionally contains product documentation, architecture, demo flow, and integration notes only. The private cryptographic signing and watermarking implementation is not published.
+| | |
+|---|---|
+| **Live portal** | https://razopay-admin.onrender.com |
+| **Live API** | https://p01--razopay-api--fbm4b6hyrltk.code.run/docs |
+| **Demo login** | `default@gmail.com` / `PayProofDemo2026!` |
+| **Track** | Track 2 — AI Risk Manager |
 
-## Why This Exists
+Try it without signing in: open the portal, click **Verify any document**, switch on
+**RazorpayX payout advice**, and upload a signed advice. Edit the amount in any image
+editor first and it comes back `ALTERED`, with the changed region boxed on the page.
 
-Important public and financial information is often shared through low-trust channels such as WhatsApp, screenshots, forwarded images, and PDFs. These files can be edited, recompressed, cropped, or forged, and ordinary users have no simple way to know whether a poster or receipt is genuine.
+---
 
-Digital Trust Shield solves this by attaching an invisible cryptographic proof to the visual document itself.
+## The problem
 
-## Core Idea
+Razorpay has a name for it. In their own 2026 settlement playbook they call the window
+between a payment being made and the money being visible the **"opacity zone"** —
+merchants know the customer paid and money eventually arrives, but visibility breaks
+down.
 
-1. A trusted authority signs a visual fingerprint of a poster, receipt, PDF page, or notice.
-2. The proof is embedded invisibly into the image pixels using a resilient watermarking strategy.
-3. A verifier app extracts the proof and validates it against the authority public key.
-4. The user sees a simple result: authentic, fake/tampered, watermark not found, or verification failed.
+NEFT and RTGS settle in batches. So a vendor holding a payout advice cannot confirm it:
+their bank shows nothing, because the credit genuinely has not arrived yet.
 
-## Current Product Scope
+Fraudsters work in exactly that window.
 
-- Admin signing portal for authorities.
-- FastAPI backend for signing, verification, metadata, audit logs, and chatbot services.
-- Android verifier app for public users.
-- Firebase Firestore for authorities, public keys, signed-document metadata, logs, and audit records.
-- Local file storage fallback for signed outputs when Firebase Storage is unavailable.
-- AI chatbot assistant using Tavily web search and Groq summarization.
-- Voice input and multilingual chatbot support for English, Kannada, and Hindi.
+- A Mumbai used-car dealer lost **₹6.5 lakh** to an edited transfer slip printed on paper.
+- Ranka Jewellers lost **₹3.48 lakh of gold** to a fabricated NEFT confirmation on a phone.
+
+Both were holding a document that looked exactly like a real one.
+
+Every defence available today says *look somewhere else* — check your bank, wait for the
+SMS, match the UTR. During the opacity zone there is nothing to look at. A soundbox
+announces UPI credits; these are not UPI.
+
+## The approach
+
+RazorpayX signs an advice **as it prints it**. The signature is not attached as metadata —
+an RSA-PSS signature and a perceptual fingerprint are spread across every 8×8 DCT block of
+the image, so the proof survives a screenshot and a trip through a messaging app.
+
+Anyone holding that page checks it in a browser and gets one of three answers:
+
+| Verdict | Meaning |
+|---|---|
+| `GENUINE` | RazorpayX issued this, and the proof is intact everywhere |
+| `ALTERED` | RazorpayX issued it, then part of it was changed — shown boxed on the page |
+| `NOT_ISSUED` | No embedded proof, or damaged past recovery |
+
+**Verification reads nothing but the file.** No database, no reference copy, no id to
+type. A document issued a year ago verifies exactly as well as one issued a minute ago,
+and Razorpay does not have to be online for a vendor to get an answer.
+
+## How tamper detection works
+
+The interesting part, because the obvious approach does not work.
+
+The signature carries a fingerprint of the whole page. That **cannot** catch small edits —
+the tolerance that lets it survive WhatsApp is the same tolerance that absorbs a repainted
+figure. Measured: the identical 4.1% edit passed on one advice and was caught on another.
+It let **11 of 16 edits through**.
+
+A finer fingerprint does not help either. A grid of regional hashes, tried at four grid
+sizes, caught **0 of 30** — each cell is still a downsample, so a changed digit gets
+averaged away.
+
+The signal is the carrier itself. The embedded signature lives in thousands of 8×8 blocks,
+each holding one bit of a payload that survives locally destroyed blocks because it is
+repeated across the page and majority-voted. So the payload is recovered **from the edited
+page**, and every block is asked whether it still agrees.
+
+Measuring *how much* damage fails: a photo of a screen concentrates damage 22× above its
+own mean, the weakest forgery only 13×.
+
+The difference is not amount, it is **shape**. Recompression scatters errors thinly and
+independently. An edit tears one contiguous patch. Measuring the largest connected patch
+separates cleanly.
+
+## Measured results
+
+Held-out evaluation split (seed 5000); thresholds were fixed on a development split
+(seed 1000) and never refitted.
+
+**Carrier tamper detection**
+
+| | |
+|---|---|
+| False accusations | **0** across 126 honest copies |
+| Missed edits | **0** across 70 edits |
+| Honest blob sizes | 0, 4, 6 — never above 6 |
+| Edited blob sizes | 7 to 27, median 13 |
+| Threshold | 7 |
+
+Before this, the fingerprint alone caught 5 of 16. Now 16 of 16.
+
+**Region localisation** — 1 edit gives 1 box, 2 give 2, 3 give 3, each on the field that
+was actually repainted.
+
+**Payout advice benchmark** (`python -m razorpayx.cli benchmark --seed 5000`)
+
+```
+Forgeries rejected      76 / 76      recall     1.000
+Falsely accused          0 / 40      precision  1.000
+Genuine passed          36 / 40      FPR        0.000
+```
+
+**Payslips** — 3/3 genuine verify on all six adjudicated fields; 9/9 forgeries rejected,
+including a single changed digit.
+
+## What it cannot do
+
+Stated because a detector's limits matter as much as its numbers.
+
+**A photograph of a screen fails at every embedding strength tested.** That is geometry,
+not signal — rescreening and perspective move the 8×8 grid the carrier is read from, and
+no amount of amplitude repairs a grid that has moved. This is the remaining 4 of 40 in the
+benchmark above.
+
+**On a heavy downscale or a messaging-app re-encode the carrier cannot be read back
+directly**, and the detector returns `cannot measure` rather than `clean`. A detector that
+reports "I could not look" as "nothing is wrong" is worse than one that declines to
+answer.
+
+## Where to look in the code
+
+| Path | What it is |
+|---|---|
+| `razorpayx/locate.py` | Tamper detection and region localisation. Every measurement is recorded in the comments, including the threshold study. |
+| `razorpayx/benchmark.py` | The held-out evaluation. |
+| `utils.py` | The signing engine — DCT embedding, fingerprint, key handling. |
+| `verify_poster.py` | Verification and its recovery tiers. |
+| `razorpayx/advice.py`, `payslip.py` | Document renderers and their field layouts. |
+| `backend/app/routes/` | FastAPI: issue, verify, accounts, audit. |
+| `admin-portal/src/pages/Verify.tsx` | The public verifier. |
+
+## Running it
+
+**Requirements:** Python 3.11, Node 20.
+
+```bash
+# API
+cd backend
+python -m venv .venv && .venv/Scripts/activate    # source .venv/bin/activate on macOS/Linux
+pip install -r requirements.txt
+cp .env.example .env                               # then fill it in
+python -m uvicorn app.main:app --reload --port 8000
+
+# Portal
+cd admin-portal
+npm ci
+npm run dev                                        # http://localhost:5173
+```
+
+`backend/.env.example` documents every variable, including why
+`REQUIRE_ADMIN_AUTH` must be `true` on anything reachable from the internet.
+
+**Run the benchmark yourself:**
+
+```bash
+python -m razorpayx.cli benchmark --advices 8 --seed 5000 --detail
+```
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    Admin["Authority Admin"] --> Portal["Admin Web Portal"]
-    Portal --> API["FastAPI Backend"]
-
-    API --> KeyStore["Encrypted Local Private Key Store"]
-    API --> Core["Private Signing and Verification Engine"]
-    API --> Firestore["Firebase Firestore"]
-    API --> LocalStorage["Local or Firebase File Storage"]
-
-    User["Citizen / Verifier"] --> Android["Android Verification App"]
-    Android --> API
-    Android --> Speech["Android Speech Recognizer"]
-
-    API --> Tavily["Tavily Web Search"]
-    API --> Groq["Groq LLM Summary"]
-
-    Firestore --> Android
+```
+Issue                                    Verify
+─────                                    ──────
+render the document                      recover the payload from the file
+        ↓                                        ↓
+fingerprint it (128-bit perceptual)      check the RSA signature
+        ↓                                        ↓
+sign with RSA-PSS                        compare the fingerprint
+        ↓                                        ↓
+weave signature + fingerprint            ask every 8×8 block if it agrees
+across every 8×8 DCT block                       ↓
+        ↓                                 largest torn patch → edited, and where
+store in S3, record in Firestore
 ```
 
-## Signing Flow
+Signing runs in one batched matrix product rather than ~25,000 per-block DCT calls —
+4.7× faster, verified against the previous output.
 
-```mermaid
-sequenceDiagram
-    participant Admin as Authority Admin
-    participant Portal as Admin Portal
-    participant API as FastAPI Backend
-    participant Core as Private Signing Engine
-    participant Store as Storage
-    participant DB as Firestore
+## Stack
 
-    Admin->>Portal: Upload poster, receipt, or PDF
-    Portal->>API: POST /api/sign with authority and key id
-    API->>API: Load encrypted private key locally
-    API->>Core: Create visual fingerprint and sign it
-    Core-->>API: Signed output with invisible proof
-    API->>Store: Save signed output
-    API->>DB: Save signed document metadata
-    API-->>Portal: Return download URL and document id
-```
+FastAPI · Firebase Auth + Firestore · Backblaze B2 (S3) · React 19 + Vite + TypeScript ·
+OpenCV + NumPy · `cryptography` (RSA-PSS over SHA-256)
 
-## Verification Flow
-
-```mermaid
-sequenceDiagram
-    participant User as User
-    participant App as Android Verifier
-    participant API as FastAPI Backend
-    participant DB as Firestore
-    participant Core as Private Verification Engine
-
-    User->>App: Select received image or screenshot
-    App->>API: POST /api/verify
-    API->>DB: Fetch selected or active public keys
-    API->>Core: Extract invisible proof
-    API->>Core: Verify RSA signature and visual fingerprint
-    Core-->>API: Authentic or not authentic
-    API-->>App: Human-readable verification result
-```
-
-## AI Chatbot Flow
-
-```mermaid
-sequenceDiagram
-    participant User as User
-    participant App as Android Chatbot
-    participant API as FastAPI Backend
-    participant Tavily as Tavily Search
-    participant Groq as Groq LLM
-
-    User->>App: Ask by text or voice
-    App->>API: POST /api/chat
-    API->>Tavily: Search the web
-    Tavily-->>API: Search results and snippets
-    API->>Groq: Summarize with sources
-    Groq-->>API: Final multilingual answer
-    API-->>App: Answer and source list
-```
-
-## Security Model
-
-- Private keys are never stored in Firebase.
-- Private keys are encrypted and stored only on the backend machine.
-- Android app receives only public keys and verification responses.
-- Firestore stores authority metadata, public keys, signed-document metadata, verification logs, and audit logs.
-- The public repository does not expose the private watermarking, signing, extraction, or screenshot-recovery implementation.
-
-## Repository Publication Policy
-
-This GitHub version is designed for public demonstration. It intentionally excludes:
-
-- RSA private keys and key backups.
-- Firebase service account credentials.
-- Full signing and watermarking source code.
-- Backend security-sensitive implementation files.
-- Android and web app source code.
-- Generated screenshots, payment images, QA artifacts, videos, and runtime logs.
-
-See [docs/PUBLICATION_POLICY.md](docs/PUBLICATION_POLICY.md) for details.
-
-## Tech Stack
-
-| Layer | Technology |
-| --- | --- |
-| Backend | Python, FastAPI |
-| Signing core | RSA signatures, perceptual fingerprints, DCT watermarking |
-| Admin portal | React, Vite, TypeScript |
-| Mobile app | Android Kotlin, Jetpack Compose |
-| Database | Firebase Firestore |
-| Storage | Local storage fallback, Firebase Storage optional |
-| AI assistant | Tavily Search API, Groq Chat Completions |
-| Voice | Android Speech Recognizer |
-
-## Demo Script
-
-1. Admin creates an authority.
-2. Admin generates a key pair.
-3. Backend stores the private key encrypted locally.
-4. Backend stores the public key in Firestore.
-5. Admin uploads and signs a poster or receipt.
-6. Signed output is shared through WhatsApp or downloaded to a phone.
-7. User opens the Android verifier app.
-8. User selects the received image or screenshot.
-9. App calls the backend verification API.
-10. App displays authentic or fake/tampered.
-11. User opens the chatbot tab and asks questions by text or voice.
-
-## Environment Variables
-
-The private implementation uses environment variables similar to:
-
-```env
-FIREBASE_CREDENTIALS=secrets/serviceAccountKey.json
-USE_LOCAL_STORAGE=true
-LOCAL_UPLOAD_DIR=uploads
-FIREBASE_STORAGE_BUCKET=
-MASTER_KEY=your_fernet_master_key
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin123
-TAVILY_API_KEY=your_tavily_key
-GROQ_API_KEY=your_groq_key
-GROQ_MODEL=llama-3.3-70b-versatile
-```
-
-Do not commit real `.env` files or service account credentials.
-
-## Public Repository Note
-
-This repository is a public showcase version. The complete implementation is retained privately by the team for demo, evaluation, and further development.
-
-## Team
-
-Team HAHAHA
-
-Project repository target:
-
-```text
-https://github.com/Hiteshacu/Digital_Trust_Shield-Team-HAHAHA...-.git
-```
+Backend on Northflank, portal on Render, both always-on.
