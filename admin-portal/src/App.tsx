@@ -285,7 +285,9 @@ export default function App() {
         {view === "keys" && <KeyManagement authorities={authorities} keys={keys} onChanged={refresh} />}
         {view === "sign" && <SignDocument authorities={authorities} keys={keys} onSigned={refresh} />}
         {view === "advice" && <PayoutAdvice onBack={() => setView("dashboard")} />}
-        {view === "documents" && <SignedDocuments documents={documents} />}
+        {view === "documents" && (
+          <SignedDocuments documents={documents} isOwner={approval.role === "owner"} />
+        )}
         {view === "audit" && <AuditLogs logs={auditLogs} />}
         {/* Guarded here as well as in the sidebar: hiding a link is a
             courtesy, not a control. The backend refuses these calls from a

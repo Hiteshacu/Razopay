@@ -213,11 +213,17 @@ export function Users({
               <tbody>
                 {overview.by_signer.map((signer) => {
                   const account = users.find((user) => user.email === signer.email);
+                  // Guarded on isOwner as well as on the account existing. The
+                  // table above does the same, and this one did not: an
+                  // administrator could click a row here and land on an
+                  // owner-only endpoint, which answers 403. Offering a link
+                  // that cannot work is worse than showing plain text.
+                  const openable = isOwner && account;
                   return (
-                  <tr key={signer.email} className={account ? "row-link" : undefined}>
+                  <tr key={signer.email} className={openable ? "row-link" : undefined}>
                     <td>
-                      {account ? (
-                        <button className="text-link" onClick={() => onOpenMember(account.uid)}>
+                      {openable ? (
+                        <button className="text-link" onClick={() => onOpenMember(account!.uid)}>
                           {signer.email}
                         </button>
                       ) : (
