@@ -148,7 +148,10 @@ services:
     name: trust-shield-admin
     runtime: static
     rootDir: admin-portal
-    buildCommand: npm install && npm run build
+    # No install here on purpose. Render runs one itself before this
+    # command, so `npm install && npm run build` walked the same lockfile
+    # twice and the second pass only ever printed "up to date".
+    buildCommand: npm run build
     staticPublishPath: ./dist
     autoDeployTrigger: commit
     envVars:
