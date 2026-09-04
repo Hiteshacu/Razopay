@@ -439,25 +439,31 @@ export function Verify({ onBack }: { onBack: () => void }) {
               </div>
               <p className="verdict-plain">{adviceVerdict.detail}</p>
 
-              {/* Where, drawn on the page itself. Nothing was compared
-                  against a record — the tear in the carrier is read out of
-                  the pixels, so the highlight is the evidence rather than a
-                  row in a table quoting a database. */}
-              {preview && adviceVerdict.status === "ALTERED" && adviceVerdict.region && (
+              {/* Every changed part, drawn on the page itself. Nothing was
+                  compared against a record — each box is a patch where the
+                  proof woven through the page is torn. */}
+              {preview && adviceVerdict.status === "ALTERED" && adviceVerdict.regions.length > 0 && (
                 <figure className="damage-figure">
                   <div className="damage-frame">
                     <img src={preview} alt="" />
-                    <span
-                      className="damage-box"
-                      style={{
-                        left: `${(adviceVerdict.region.left / adviceVerdict.image_width) * 100}%`,
-                        top: `${(adviceVerdict.region.top / adviceVerdict.image_height) * 100}%`,
-                        width: `${((adviceVerdict.region.right - adviceVerdict.region.left) / adviceVerdict.image_width) * 100}%`,
-                        height: `${((adviceVerdict.region.bottom - adviceVerdict.region.top) / adviceVerdict.image_height) * 100}%`
-                      }}
-                    />
+                    {adviceVerdict.regions.map((box, index) => (
+                      <span
+                        key={`${box.left}-${box.top}-${index}`}
+                        className="damage-box"
+                        style={{
+                          left: `${(box.left / adviceVerdict.image_width) * 100}%`,
+                          top: `${(box.top / adviceVerdict.image_height) * 100}%`,
+                          width: `${((box.right - box.left) / adviceVerdict.image_width) * 100}%`,
+                          height: `${((box.bottom - box.top) / adviceVerdict.image_height) * 100}%`
+                        }}
+                      />
+                    ))}
                   </div>
-                  <figcaption>This part of the page was changed after it was signed.</figcaption>
+                  <figcaption>
+                    {adviceVerdict.regions.length === 1
+                      ? "This part of the page was changed after it was signed."
+                      : `${adviceVerdict.regions.length} parts of the page were changed after it was signed.`}
+                  </figcaption>
                 </figure>
               )}
 
@@ -483,28 +489,34 @@ export function Verify({ onBack }: { onBack: () => void }) {
               </div>
               <p className="verdict-plain">{verdict.plain}</p>
 
-              {/* Where, drawn on the page the reader uploaded.
-                  Percentages rather than pixels: the preview is scaled to fit,
-                  and a box positioned in the original's pixel space would sit
-                  somewhere else entirely on a 1000px page shown at 460. */}
-              {preview && result.details?.carrier?.damaged_region && (
+              {/* Every changed part, drawn on the page the reader uploaded.
+                  Percentages rather than pixels: the carrier may have been
+                  read at a different scale than the file was uploaded at, and
+                  the preview is scaled again to fit. */}
+              {preview && (result.details?.carrier?.regions?.length ?? 0) > 0 && (
                 <figure className="damage-figure">
                   <div className="damage-frame">
                     <img src={preview} alt="" />
-                    <span
-                      className="damage-box"
-                      style={{
-                        left: `${(result.details.carrier!.damaged_region!.left / naturalSize.w) * 100}%`,
-                        top: `${(result.details.carrier!.damaged_region!.top / naturalSize.h) * 100}%`,
-                        width: `${((result.details.carrier!.damaged_region!.right - result.details.carrier!.damaged_region!.left) / naturalSize.w) * 100}%`,
-                        height: `${((result.details.carrier!.damaged_region!.bottom - result.details.carrier!.damaged_region!.top) / naturalSize.h) * 100}%`
-                      }}
-                    />
+                    {result.details!.carrier!.regions!.map((box, index) => {
+                      const w = result.details!.carrier!.read_width || naturalSize.w;
+                      const h = result.details!.carrier!.read_height || naturalSize.h;
+                      return (
+                        <span
+                          key={`${box.left}-${box.top}-${index}`}
+                          className="damage-box"
+                          style={{
+                            left: `${(box.left / w) * 100}%`,
+                            top: `${(box.top / h) * 100}%`,
+                            width: `${((box.right - box.left) / w) * 100}%`,
+                            height: `${((box.bottom - box.top) / h) * 100}%`
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                   <figcaption>
-                    The proof woven through the page is torn here. Read out of the
-                    pixels themselves — nothing was compared against a record of
-                    what this page used to say.
+                    The proof woven through the page is torn here — read out of the
+                    pixels themselves, not from any record of what this page said.
                   </figcaption>
                 </figure>
               )}

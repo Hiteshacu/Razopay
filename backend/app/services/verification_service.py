@@ -97,16 +97,13 @@ class VerificationService:
                 "threshold": EDIT_BLOB_THRESHOLD,
                 "background_rate": round(finding.background_rate, 4),
             }
-            if finding.region is not None:
-                payload["damaged_region"] = {
-                    "left": finding.region.left,
-                    "top": finding.region.top,
-                    "right": finding.region.right,
-                    "bottom": finding.region.bottom,
-                    "peak_x": finding.region.peak_x,
-                    "peak_y": finding.region.peak_y,
-                    "concentration": round(finding.region.concentration, 2),
-                }
+            payload["read_width"] = finding.read_width
+            payload["read_height"] = finding.read_height
+            payload["regions"] = [
+                {"left": r.left, "top": r.top, "right": r.right,
+                 "bottom": r.bottom, "blocks": r.blocks}
+                for r in finding.regions
+            ]
             return payload
         except Exception:
             return None

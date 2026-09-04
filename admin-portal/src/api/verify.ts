@@ -54,15 +54,16 @@ export type VerifyResult = {
       blob: number;
       threshold: number;
       background_rate: number;
-      damaged_region?: {
+      /** Size the carrier was read at — boxes are in these coordinates. */
+      read_width?: number;
+      read_height?: number;
+      regions?: Array<{
         left: number;
         top: number;
         right: number;
         bottom: number;
-        peak_x: number;
-        peak_y: number;
-        concentration: number;
-      };
+        blocks: number;
+      }>;
     };
     [key: string]: unknown;
   };

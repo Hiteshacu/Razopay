@@ -250,16 +250,14 @@ def _check_from_signature(upload: Path, public_pem: Path, label: str) -> dict:
     image = read_image(upload)
     finding = inspect_carrier(image)
 
-    region = None
-    if finding.region is not None:
-        region = {
-            "left": finding.region.left,
-            "top": finding.region.top,
-            "right": finding.region.right,
-            "bottom": finding.region.bottom,
-            "peak_x": finding.region.peak_x,
-            "peak_y": finding.region.peak_y,
-        }
+    # Every torn patch, not just the largest. A forger who changes two figures
+    # leaves two, and showing one of them tells the reader the page is wrong
+    # while pointing away from half of what is wrong with it.
+    regions = [
+        {"left": r.left, "top": r.top, "right": r.right, "bottom": r.bottom,
+         "blocks": r.blocks}
+        for r in finding.regions
+    ]
 
     try:
         outcome = verify_poster(upload, public_key_path=public_pem, audit=False)
@@ -268,10 +266,17 @@ def _check_from_signature(upload: Path, public_pem: Path, label: str) -> dict:
     except Exception as exc:
         signed_ok, engine_message = False, str(exc).lower()
 
+    # Boxes are in the coordinates the carrier was read at, which is not the
+    # uploaded size when recovery succeeded at another scale — so those
+    # dimensions travel with them rather than the upload's.
     height, width = image.shape[:2]
-    base = {"image_width": int(width), "image_height": int(height),
-            "measurable": finding.measurable, "blob": finding.blob,
-            "region": region}
+    base = {
+        "image_width": int(finding.read_width or width),
+        "image_height": int(finding.read_height or height),
+        "measurable": finding.measurable,
+        "blob": finding.blob,
+        "regions": regions,
+    }
 
     # The carrier is torn in one place: an edit the page fingerprint's
     # tolerance is wide enough to absorb, which is the case it is blind to.

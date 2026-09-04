@@ -68,6 +68,9 @@ class Region:
     concentration: float
     #: Fraction of carrier blocks that disagree across the whole page.
     background_rate: float
+    #: How many carrier blocks this patch covers. What decides whether it is
+    #: an edit at all, and what the regions are ordered by.
+    blocks: int = 0
 
     @property
     def box(self) -> tuple[int, int, int, int]:
@@ -96,71 +99,213 @@ def disagreement_map(image: np.ndarray, payload_bits: np.ndarray) -> np.ndarray:
     return grid.reshape(rows, cols)
 
 
-def locate(image: np.ndarray, payload_bits: np.ndarray, *, window: int = WINDOW) -> Region | None:
-    """The densest patch of carrier damage, or None if there is no carrier.
+#: A connected patch smaller than this is not reported as a region.
+#:
+#: Four is what an honest page produces at most — the smallest component a 2x2
+#: opening can leave — so anything at or below it is the scatter that
+#: recompression makes everywhere, not an edit.
+MIN_REGION_BLOCKS = 5
 
-    Returns a region for any image, including an untouched one — it is a
-    pointer, not a verdict, and it is the caller's job to have established
-    that something is wrong before showing a reader where.
+#: How far apart two torn fragments may be and still count as one edit, in
+#: blocks: (vertical, horizontal).
+#:
+#: Deliberately not square, because an edited field is not square. A printed
+#: value is about 62px tall and several hundred wide — eight blocks by seventy
+#: — so its fragments land tens of blocks apart across the line and only a few
+#: apart down it. A square bridge wide enough to join them vertically would
+#: swallow the field above and below; this one reaches along a line without
+#: reaching to the next.
+BRIDGE_BLOCKS = (3, 25)
+
+#: Horizontal gap, in pixels, below which two boxes on the same line are folded
+#: into one. A printed value can tear either side of a run of blocks that
+#: happened to survive, leaving a hole the dilation does not quite close.
+MERGE_GAP_PX = 120
+
+
+def locate_all(
+    image: np.ndarray,
+    payload_bits: np.ndarray,
+    *,
+    min_blocks: int = MIN_REGION_BLOCKS,
+    pad: int = 2,
+) -> list[Region]:
+    """Every torn patch of carrier, largest first.
+
+    One box was not enough, and it was the wrong shape as well as the wrong
+    count. Reporting the densest fixed window meant a 7x7 square drawn wherever
+    the peak fell, so an edit spanning a whole row of the page was marked with
+    a small square somewhere inside it while the rest went unmarked — and a
+    second edit elsewhere was never mentioned at all.
+
+    Each patch is now its own connected component, and its box is that
+    component's own extent rather than a fixed window, padded slightly so the
+    highlight reads as covering the change rather than sitting inside it.
     """
     grid = disagreement_map(image, payload_bits)
     if grid.size == 0:
-        return None
+        return []
 
     background = float(grid.mean())
-    density = cv2.blur(grid, (window, window))
-    _, peak, _, (px, py) = cv2.minMaxLoc(density)
+    binary = (grid > 0.5).astype(np.uint8)
+    opened = cv2.morphologyEx(binary, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
 
-    half = window // 2
-    left = max(0, px - half) * u.BLOCK_SIZE
-    top = max(0, py - half) * u.BLOCK_SIZE
-    right = min(grid.shape[1], px + half + 1) * u.BLOCK_SIZE
-    bottom = min(grid.shape[0], py + half + 1) * u.BLOCK_SIZE
+    # Bridge the gaps inside one edit before counting patches.
+    #
+    # A repainted field does not tear the carrier evenly: some blocks inside it
+    # still happen to decode correctly, so the damage arrives as a handful of
+    # fragments a few blocks apart. Taken literally that is eighteen patches
+    # for three edits, and eighteen overlapping boxes drawn on the page is
+    # worse than one — the reader cannot tell how many things were changed.
+    #
+    # Dilating joins fragments belonging to the same field. The kernel is
+    # wide and short because the thing being rejoined is: a printed value runs
+    # along a line, so its fragments are far apart across the page and close
+    # together down it.
+    merged = cv2.dilate(opened, np.ones(BRIDGE_BLOCKS, np.uint8))
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(merged, connectivity=8)
 
-    return Region(
-        left=int(left),
-        top=int(top),
-        right=int(right),
-        bottom=int(bottom),
-        peak_x=int(px * u.BLOCK_SIZE + u.BLOCK_SIZE // 2),
-        peak_y=int(py * u.BLOCK_SIZE + u.BLOCK_SIZE // 2),
-        concentration=float(peak / background) if background > 0 else 0.0,
-        background_rate=background,
+    regions: list[Region] = []
+    for index in range(1, count):
+        # Counted on the undilated map: dilation is there to group fragments,
+        # not to inflate how much damage was found.
+        area = int(opened[labels == index].sum())
+        if area < min_blocks:
+            continue
+        x = int(stats[index, cv2.CC_STAT_LEFT])
+        y = int(stats[index, cv2.CC_STAT_TOP])
+        w = int(stats[index, cv2.CC_STAT_WIDTH])
+        h = int(stats[index, cv2.CC_STAT_HEIGHT])
+
+        left = max(0, x - pad) * u.BLOCK_SIZE
+        top = max(0, y - pad) * u.BLOCK_SIZE
+        right = min(grid.shape[1], x + w + pad) * u.BLOCK_SIZE
+        bottom = min(grid.shape[0], y + h + pad) * u.BLOCK_SIZE
+
+        # Density inside this patch against the page's own error rate, which
+        # is the only comparison that survives an image damaged all over.
+        patch = grid[y:y + h, x:x + w]
+        density = float(patch.mean()) if patch.size else 0.0
+
+        regions.append(Region(
+            left=int(left), top=int(top), right=int(right), bottom=int(bottom),
+            peak_x=int((x + w / 2) * u.BLOCK_SIZE),
+            peak_y=int((y + h / 2) * u.BLOCK_SIZE),
+            concentration=float(density / background) if background > 0 else 0.0,
+            background_rate=background,
+            blocks=area,
+        ))
+
+    return _merge_overlapping(regions)
+
+
+def _merge_overlapping(regions: list[Region]) -> list[Region]:
+    """Fold together regions whose boxes intersect.
+
+    The dilation joins fragments along a line, but a fragment sitting directly
+    above or below the rest of its field is reached by neither the horizontal
+    bridge nor the short vertical one — so it survives as its own component and
+    is drawn as a second box inside the first. Two overlapping highlights are
+    one region to whoever is looking at them.
+
+    Blocks add up across a merge, so the count still says how much of the
+    carrier was torn rather than how many pieces it arrived in.
+    """
+    ordered = sorted(regions, key=lambda r: -r.blocks)
+    merged: list[Region] = []
+    for candidate in ordered:
+        for index, kept in enumerate(merged):
+            # Near counts as overlapping, and only along the line. Two boxes
+            # on the same row with a small gap between them are one changed
+            # value to whoever is looking; two boxes in the same column are
+            # two different fields, so the vertical tolerance stays at zero.
+            near = not (
+                candidate.right + MERGE_GAP_PX <= kept.left
+                or candidate.left >= kept.right + MERGE_GAP_PX
+                or candidate.bottom <= kept.top
+                or candidate.top >= kept.bottom
+            )
+            if near:
+                left, top = min(kept.left, candidate.left), min(kept.top, candidate.top)
+                right = max(kept.right, candidate.right)
+                bottom = max(kept.bottom, candidate.bottom)
+                merged[index] = Region(
+                    left=left, top=top, right=right, bottom=bottom,
+                    peak_x=(left + right) // 2, peak_y=(top + bottom) // 2,
+                    concentration=max(kept.concentration, candidate.concentration),
+                    background_rate=kept.background_rate,
+                    blocks=kept.blocks + candidate.blocks,
+                )
+                break
+        else:
+            merged.append(candidate)
+
+    merged.sort(key=lambda r: -r.blocks)
+    return merged
+
+
+def locate(image: np.ndarray, payload_bits: np.ndarray, *, window: int = WINDOW) -> Region | None:
+    """The largest torn patch, or None if there is none worth reporting."""
+    found = locate_all(image, payload_bits)
+    return found[0] if found else None
+
+
+def payload_bits_for(image: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
+    """Recover the payload, and return the image it was recovered from.
+
+    Both, and that is the point. The extractor retries at several scales — a
+    forwarded copy is often a resized copy, and the carrier only reads back
+    when the 8x8 grid lines up with the one it was written on. So the payload
+    may well come from a rescaled version of what was uploaded.
+
+    Returning only the bits, as this did, silently paired them with the
+    original: the disagreement map then compared a payload recovered at 0.5x
+    against blocks measured at 1.0x, so every block disagreed and the result
+    was noise dressed up as a finding. The scale has to travel with the bits.
+
+    None means the payload could not be recovered at any scale — no carrier
+    left to reason about, which is a refusal rather than a guess.
+    """
+    from watermark_extractor import (
+        RESIZE_RECOVERY_FACTORS,
+        _extract_watermark_bundle_from_array,
     )
 
-
-def payload_bits_for(image: np.ndarray) -> np.ndarray | None:
-    """Recover the payload from an image so its own blocks can be judged.
-
-    Recovered from the image in hand rather than from the issuing record, so
-    localisation needs nothing but the file — and because a payload that
-    cannot be recovered means there is no carrier left to reason about, which
-    is a `None` rather than a guess.
-    """
-    from watermark_extractor import extract_watermark_bundle
-
-    try:
-        fingerprint, signature_b64 = extract_watermark_bundle(image)
-    except Exception:
-        return None
-    payload = u.build_watermark_payload(u.signature_from_base64(signature_b64), fingerprint)
-    return u.bytes_to_bits(payload)
+    for factor in RESIZE_RECOVERY_FACTORS:
+        candidate = image
+        if factor != 1.0:
+            height, width = image.shape[:2]
+            candidate = cv2.resize(
+                image,
+                (int(round(width * factor)), int(round(height * factor))),
+                interpolation=cv2.INTER_CUBIC,
+            )
+        try:
+            fingerprint, signature_b64 = _extract_watermark_bundle_from_array(candidate)
+        except Exception:
+            continue
+        payload = u.build_watermark_payload(u.signature_from_base64(signature_b64), fingerprint)
+        return u.bytes_to_bits(payload), candidate
+    return None
 
 
 #: Largest connected patch of disagreeing carrier blocks, after a 2x2 opening,
-#: above which a page is called edited.
+#: at or above which a page is called edited.
 #:
-#: Measured over 48 honest journeys and 32 edits on rendered advices. Honest
-#: pages produced a blob of 0 (30 times) or exactly 4 (18 times) and never
-#: more; edits produced 6 to 27. Four is not a coincidence — the opening's
-#: smallest surviving component is one 2x2 block, so an honest page has at
-#: most one isolated cluster, while an edit leaves a patch.
+#: Measured over 126 honest journeys and 70 edits. Honest pages produced 0 (69
+#: times), 4 (49) and 6 (8), and never more. Edits started at 7, with a median
+#: of 13. Seven is therefore the only value that costs nothing in either
+#: direction: no honest page reaches it, and no edit falls below it.
 #:
-#: Set at the observed floor of the edited range rather than midway. The two
-#: errors are not equal: missing a smaller edit costs one consignment of
-#: goods, and calling an honest payer's advice forged costs them the customer
-#: they were trying to pay. The margin belongs on the honest side.
-EDIT_BLOB_THRESHOLD = 6
+#: It was 6, set against 48 honest samples whose worst case happened to be 4. A
+#: wider run put eight honest JPEGs at 6 exactly, which the old threshold read
+#: as forged — sampling variance rather than a bug, and the reason a number
+#: this consequential is worth measuring against the tail rather than the bulk.
+#:
+#: If it has to move again it should move up. The two errors are not equal:
+#: missing a smaller edit costs one consignment of goods, while calling an
+#: honest payer's advice forged costs them the customer they were paying.
+EDIT_BLOB_THRESHOLD = 7
 
 
 @dataclass(frozen=True)
@@ -174,8 +319,17 @@ class CarrierFinding:
     blob: int
     #: Fraction of carrier blocks disagreeing across the whole page.
     background_rate: float
-    #: Where that patch is, when there is one.
-    region: Region | None
+    #: Every torn patch, largest first. Empty when nothing crosses the floor.
+    regions: tuple[Region, ...] = ()
+    #: Width and height of the image the carrier was actually read from, which
+    #: is not the uploaded size when recovery succeeded at another scale. Boxes
+    #: are in these coordinates, so a caller drawing them needs this to convert.
+    read_width: int = 0
+    read_height: int = 0
+
+    @property
+    def region(self) -> Region | None:
+        return self.regions[0] if self.regions else None
 
     @property
     def edited(self) -> bool:
@@ -206,13 +360,14 @@ def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFindin
     detector that treats "I could not look" as "I saw nothing wrong" is worse
     than one that declines.
     """
-    bits = payload_bits_for(image)
-    if bits is None:
-        return CarrierFinding(measurable=False, blob=0, background_rate=0.0, region=None)
+    recovered = payload_bits_for(image)
+    if recovered is None:
+        return CarrierFinding(measurable=False, blob=0, background_rate=0.0)
+    bits, read_image = recovered
 
-    grid = disagreement_map(image, bits)
+    grid = disagreement_map(read_image, bits)
     if grid.size == 0:
-        return CarrierFinding(measurable=False, blob=0, background_rate=0.0, region=None)
+        return CarrierFinding(measurable=False, blob=0, background_rate=0.0)
 
     background = float(grid.mean())
     binary = (grid > 0.5).astype(np.uint8)
@@ -222,18 +377,22 @@ def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFindin
     count, _, stats, _ = cv2.connectedComponentsWithStats(opened, connectivity=8)
     blob = int(stats[1:, cv2.CC_STAT_AREA].max()) if count > 1 else 0
 
+    height, width = read_image.shape[:2]
     return CarrierFinding(
         measurable=True,
         blob=blob,
         background_rate=background,
-        region=locate(image, bits, window=window),
+        regions=tuple(locate_all(read_image, bits)),
+        read_width=int(width),
+        read_height=int(height),
     )
 
 
 def locate_in_file(path: str | Path, *, window: int = WINDOW) -> Region | None:
     """Convenience: read an image, recover its payload, and point."""
     image = u.read_image(path)
-    bits = payload_bits_for(image)
-    if bits is None:
+    recovered = payload_bits_for(image)
+    if recovered is None:
         return None
-    return locate(image, bits, window=window)
+    bits, read_image = recovered
+    return locate(read_image, bits, window=window)

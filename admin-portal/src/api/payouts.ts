@@ -54,15 +54,19 @@ export type AdviceVerdict = {
   measurable: boolean;
   /** Largest torn patch of carrier, in blocks. */
   blob: number;
-  /** Where the tear is. Present when there is a carrier to read. */
-  region?: {
+  /**
+   * Every torn patch, largest first, in the coordinates above.
+   *
+   * Plural because a forger who changes two figures leaves two, and showing
+   * one of them points the reader away from half of what is wrong.
+   */
+  regions: Array<{
     left: number;
     top: number;
     right: number;
     bottom: number;
-    peak_x: number;
-    peak_y: number;
-  } | null;
+    blocks: number;
+  }>;
 };
 
 export function adviceImageUrl(payoutId: string): string {
