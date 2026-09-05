@@ -105,7 +105,12 @@ class VerificationService:
                 for r in finding.regions
             ]
             return payload
-        except Exception:
+        except Exception as exc:
+            # Never fail a verification over this, but never swallow it
+            # silently either: this returning None looks exactly like a page
+            # with nothing wrong, and the only difference visible from outside
+            # is that no region is ever drawn.
+            print(f"WARNING: carrier inspection failed for {upload_path.name}: {exc}", flush=True)
             return None
 
     def _verify_with_public_key(
@@ -179,6 +184,30 @@ class VerificationService:
             }
         except Exception as exc:
             result_code, reason = self._classify_error(exc)
+            details: dict = {"technical_error": str(exc)}
+
+            # The engine raises rather than returns on a fingerprint mismatch,
+            # so a page edited enough to break the whole-page fingerprint lands
+            # here — and this branch used to say TAMPERED and show the reader
+            # nothing, no region and no box, on exactly the documents where
+            # where matters most. The carrier is worth asking only for that
+            # verdict: TAMPERED means the payload was recovered and checked, so
+            # there is a carrier to reason about. WATERMARK_NOT_FOUND means
+            # there is not, and asking costs a full read at a dozen scales to
+            # be told what is already known.
+            if result_code == "TAMPERED":
+                carrier = self._inspect_carrier(upload_path)
+                if carrier:
+                    details["carrier"] = carrier
+                    count = len(carrier.get("regions") or ())
+                    if count:
+                        where = "in one region" if count == 1 else f"in {count} separate regions"
+                        reason = (
+                            "The document was signed, but the page no longer matches "
+                            f"what was signed — the proof woven through it is broken {where}, "
+                            "shown on the image."
+                        )
+
             return {
                 "success": False,
                 "result": result_code,
@@ -186,7 +215,7 @@ class VerificationService:
                 "authority_name": key.get("authority_name"),
                 "authority_id": key.get("authority_id"),
                 "key_id": key_id,
-                "details": {"technical_error": str(exc)},
+                "details": details,
             }
         finally:
             public_key_path.unlink(missing_ok=True)

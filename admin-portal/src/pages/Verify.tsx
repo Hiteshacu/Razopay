@@ -487,7 +487,14 @@ export function Verify({ onBack }: { onBack: () => void }) {
                   <code>{result.result}</code>
                 </div>
               </div>
-              <p className="verdict-plain">{verdict.plain}</p>
+              {/* The stock line for the verdict, unless the carrier found
+                  something more specific to say — how many places on the
+                  page changed, which the boxes below are about to show. */}
+              <p className="verdict-plain">
+                {(result.details?.carrier?.regions?.length ?? 0) > 0 && result.reason
+                  ? result.reason
+                  : verdict.plain}
+              </p>
 
               {/* Every changed part, drawn on the page the reader uploaded.
                   Percentages rather than pixels: the carrier may have been

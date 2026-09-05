@@ -42,6 +42,15 @@ restores contrast, which puts those blocks back on the coin toss, and three
 blocks by three is too little to survive the opening at half strength. An edit
 to the headline the reader actually looks at is caught at every size tested.
 
+How much of a page carries a bit at all turns out to matter as much as the
+statistic. The payload is repeated at most eleven times however large the page
+is, so a 1000x1400 advice writes a bit into 93% of its blocks while a 2000x2600
+photograph of a letter writes into 31%. A window that cannot tell an unwritten
+block from an intact one reads two thirds of a large page as evidence of
+innocence, and a small edit falls apart inside it. The window is therefore
+sized to the page's carrier density, which leaves dense pages exactly as they
+were and halves the misses on large ones.
+
 What it cannot do is read a page whose payload will not come back — a heavy
 downscale, or a messaging-app re-encode, where recovery needs the registry
 rather than a direct read. Those return measurable=False and make no claim,
@@ -177,21 +186,100 @@ WEAK_MARGIN_FRACTION = 0.35
 MIN_PAGE_MARGIN = 1.5
 
 
-def carrier_weakness(image: np.ndarray, payload_bits: np.ndarray) -> tuple[np.ndarray, float]:
-    """Blocks whose carrier has been flattened, and the page's own margin.
+def carrier_weakness(
+    image: np.ndarray, payload_bits: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Blocks whose carrier has been flattened, which blocks carry one, and
+    the page's own margin.
 
-    Returns a 0/1 grid over blocks and the median margin it was judged
-    against. A margin below MIN_PAGE_MARGIN means the page cannot be judged;
-    callers check for it rather than reading the grid.
+    The written mask travels with the weak map because on a large page most
+    blocks are not written at all, and morphology that cannot tell a block
+    carrying nothing from a block carrying an intact bit reads the first as
+    evidence of innocence. See `opened_weak`.
+
+    A margin below MIN_PAGE_MARGIN means the page cannot be judged; callers
+    check for it rather than reading the grid.
     """
     margin = carrier_margin(image, payload_bits)
     written = ~np.isnan(margin)
     if not written.any():
-        return np.zeros(margin.shape, dtype=np.uint8), 0.0
+        empty = np.zeros(margin.shape, dtype=np.uint8)
+        return empty, empty, 0.0
 
     page_margin = float(np.nanmedian(margin))
     weak = written & (margin < page_margin * WEAK_MARGIN_FRACTION)
-    return weak.astype(np.uint8), page_margin
+    return weak.astype(np.uint8), written.astype(np.uint8), page_margin
+
+
+#: How many blocks carrying a bit an opening window has to hold before the
+#: patch under it counts as solid rather than as scatter.
+#:
+#: Four, because that is what a 2x2 opening asked for on the page this was
+#: first measured on, and the point of the window sizing below is to keep
+#: asking for the same thing as the page grows.
+MIN_CORE_CARRIERS = 4
+
+#: Expected carriers a window must hold before it is wide enough. Sized so a
+#: page like the payout advice, where 93.5% of blocks carry a bit, still gets
+#: the 2x2 window every threshold here was measured against.
+_WINDOW_CARRIER_TARGET = 3.7
+
+
+def opened_weak(weak: np.ndarray, written: np.ndarray) -> tuple[np.ndarray, float]:
+    """Solid patches of flattened carrier, and the page's carrier density.
+
+    An opening keeps a block only if it sits inside a solid piece, and that is
+    the whole distinction being measured: recompression thins the carrier in
+    scattered blocks, an edit flattens a contiguous piece of it. The trouble is
+    what "solid" means when a third of the page carries no bit at all.
+
+    The payload is repeated at most eleven times however large the page is, so
+    the share of blocks carrying a bit falls as the page grows: 93.5% on a
+    1000x1400 payout advice, 65% on a 1400x1750 scanned letter, 31% on a
+    2000x2600 phone photograph of one. A fixed 2x2 opening treats every block
+    carrying nothing as a block that is fine, so on those larger pages an edit
+    arrives as a sieve and dissolves. Measured on letters at three sizes, on
+    the same files: 18 of 21 edits went through on the development split and 32
+    of 42 on the held-out one, and the ones that survived did so at the
+    smallest size.
+
+    So the window grows until it expects to hold as many carriers as a 2x2
+    window held on the page this was calibrated on, and only blocks carrying a
+    bit are allowed to vote. A window passes when every carrier under it is
+    weak and there are at least MIN_CORE_CARRIERS of them, which on a dense
+    page is exactly the old rule and on a sparse one is the same question asked
+    over a wider patch of paper.
+
+    Only the window that decides whether a patch is solid grows with the page.
+    What puts the patch back together afterwards stays a 2x2, because that is a
+    reconnection and not a measurement: dilating by the wide window instead
+    inflates every unavoidable speck by its own area — sixteen blocks on the
+    sparsest pages — and an honest letter then reads larger than a real edit of
+    a date. Masking the result back down to blocks that carry a bit was also
+    measured and is worse again, in the other direction: it shrinks every patch
+    on a dense page and cost nine payout-advice edits for nothing.
+
+    Measured across four splits, two page shapes: this pairing accuses nobody
+    and misses 27 of 232 edits. A fixed 2x2 doing both jobs misses 61, almost
+    all of them on the larger pages.
+    """
+    density = float(written.mean())
+    if density <= 0:
+        return np.zeros_like(weak), 0.0
+
+    side = 2
+    while side < 8 and side * side * density < _WINDOW_CARRIER_TARGET:
+        side += 1
+
+    kernel = np.ones((side, side), np.uint8)
+    carriers_near = cv2.filter2D(written.astype(np.float32), -1, kernel,
+                                 borderType=cv2.BORDER_CONSTANT)
+    weak_near = cv2.filter2D(weak.astype(np.float32), -1, kernel,
+                             borderType=cv2.BORDER_CONSTANT)
+
+    core = ((carriers_near >= MIN_CORE_CARRIERS) & (weak_near >= carriers_near))
+    reconnect = np.ones((2, 2), np.uint8)
+    return cv2.dilate(core.astype(np.uint8), reconnect), density
 
 
 def disagreement_map(image: np.ndarray, payload_bits: np.ndarray) -> np.ndarray:
@@ -268,13 +356,13 @@ def locate_all(
     component's own extent rather than a fixed window, padded slightly so the
     highlight reads as covering the change rather than sitting inside it.
     """
-    weak, page_margin = carrier_weakness(image, payload_bits)
+    weak, written, page_margin = carrier_weakness(image, payload_bits)
     if weak.size == 0 or page_margin < MIN_PAGE_MARGIN:
         return []
 
     grid = weak.astype(np.float32)
     background = float(grid.mean())
-    opened = cv2.morphologyEx(weak, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    opened, _ = opened_weak(weak, written)
 
     # Bridge the gaps inside one edit before counting patches.
     #
@@ -293,7 +381,7 @@ def locate_all(
 
     regions: list[Region] = []
     for index in range(1, count):
-        # Counted on the undilated map: dilation is there to group fragments,
+        # Counted on the undilated map: bridging is there to group fragments,
         # not to inflate how much damage was found.
         area = int(opened[labels == index].sum())
         if area < min_blocks:
@@ -415,20 +503,29 @@ def payload_bits_for(image: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
     return None
 
 
-#: Largest connected patch of weakened carrier blocks, after a 2x2 opening, at
-#: or above which a page is called edited.
+#: Largest connected patch of weakened carrier blocks, after the opening, at or
+#: above which a page is called edited.
 #:
-#: Nine, measured on the weak map. The number moved with the signal underneath
-#: it: it was 7 when the map was sign disagreement, and that pairing let 33 of
-#: 65 measurable edits through — every one of them a small edit, because a
-#: repainted digit only flips half the signs it touches. On the margin map the
-#: same edits produce solid patches of 10 to 580 blocks, and honest journeys
-#: reach 8 at the very worst (a sharpened copy; JPEG down to quality 35, a
-#: brightened page and a dimmed one all sit at 4 or below).
+#: Nine, measured over two corpora at once and on both their splits: payout
+#: advices at 1000x1400, where 93% of blocks carry a bit, and scanned-letter
+#: pages at 1400x1750 through 2000x2500, where a third or less do. Honest
+#: journeys across all four reach 8 at the very worst — a sharpened copy — and
+#: nine is the lowest value that accuses none of them.
+#:
+#: Eight was measured too. It costs one false accusation, on a sharpened advice,
+#: and buys ten edits. Not taken: the errors are not equal, and the rule below
+#: about which way this moves was written before there was a case for breaking
+#: it.
+#:
+#: The number has moved twice, each time because the signal under it changed.
+#: It was 7 against sign disagreement, which let 33 of 65 measurable edits
+#: through; 9 against the margin map with a fixed 2x2 opening, which was right
+#: for advices and let 16 of 21 letter edits through because most blocks of a
+#: large page carry nothing and a fixed window reads them as intact.
 #:
 #: The fraction the weak map is cut at barely matters — anything from 0.20 to
-#: 0.50 of the page median gives the same answer on every sample — so the one
-#: number that does matter is this one.
+#: 0.50 of the page median gives the same answer on every sample — so this and
+#: the window sizing are the numbers that do.
 #:
 #: If it has to move again it should move up. The two errors are not equal:
 #: missing a smaller edit costs one consignment of goods, while calling an
@@ -495,7 +592,7 @@ def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFindin
         return CarrierFinding(measurable=False, blob=0, background_rate=0.0)
     bits, read_image = recovered
 
-    weak, page_margin = carrier_weakness(read_image, bits)
+    weak, written, page_margin = carrier_weakness(read_image, bits)
     if weak.size == 0 or page_margin < MIN_PAGE_MARGIN:
         # The carrier is there — the payload came back — but flattened far
         # enough that a patch of flattened blocks says nothing about which part
@@ -504,8 +601,9 @@ def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFindin
 
     background = float(weak.mean())
     # Opening drops lone blocks and keeps solid patches, which is the whole
-    # distinction being measured.
-    opened = cv2.morphologyEx(weak, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    # distinction being measured, over a window sized to how much of this page
+    # carries a bit at all.
+    opened, _ = opened_weak(weak, written)
     count, _, stats, _ = cv2.connectedComponentsWithStats(opened, connectivity=8)
     blob = int(stats[1:, cv2.CC_STAT_AREA].max()) if count > 1 else 0
 

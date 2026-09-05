@@ -88,26 +88,60 @@ recompression only thins it. Judged against the page's *own* median margin, so a
 brightened or heavily recompressed copy is compared with itself rather than with an
 absolute number.
 
+One more thing decides whether that works, and it only shows up on real documents. The
+payload is repeated at most eleven times however large the page is, so the share of blocks
+carrying a bit at all falls as the page grows:
+
+| Page | Blocks | Carry a bit |
+|---|---|---|
+| Payout advice, 1000×1400 | 21,875 | **93%** |
+| Scanned letter, 1400×1750 | 38,150 | **65%** |
+| Phone photo of one, 2000×2600 | 81,250 | **31%** |
+
+A fixed window asking "are all four of my neighbours damaged?" reads every block carrying
+nothing as a block that is fine. On a large page an edit therefore arrives as a sieve and
+dissolves — 32 of 42 letter edits went through that way. So the window grows until it
+expects to hold as many carriers as it held on the page the thresholds were measured on,
+and only blocks carrying a bit are allowed to vote. What reconnects the pieces afterwards
+stays fixed, because that is a reconnection and not a measurement.
+
 ## Measured results
 
 Held-out evaluation split (seed 5000); thresholds were fixed on a development split
 (seed 1000) and never refitted.
 
-**Carrier tamper detection**, over 72 honest copies and 104 edits the carrier could be
-read from:
+**Carrier tamper detection.** Two corpora, each split into a development set the
+thresholds were fixed on and a held-out set they were never refitted against: payout
+advices at 1000×1400, and scanned-letter pages at 1400×1750 through 2000×2500.
 
-| | Sign disagreement | Margin collapse |
+| Detector | False accusations | Missed edits |
 |---|---|---|
-| False accusations | 0 | **0** |
-| Missed edits | 52 of 104 | **8 of 104** |
-| Honest patch sizes | 0–6 | 0–8 |
-| Edited patch sizes | 0–27 | 10–629 |
-| Threshold | 7 | **9** |
+| Margin collapse, fixed window | 0 of 198 | 61 of 232 |
+| Margin collapse, window sized to carrier density | **0 of 198** | **27 of 232** |
 
-The 52 misses were all small edits — one digit erased or swapped — which is the case a
-forger actually needs. The 8 that remain are one narrow case: a single digit in the small
-secondary amount row, replaced by a same-width glyph. Every edit to the headline amount is
-caught at every size tested.
+(Sign disagreement, the detector before either of these, was measured on the advice corpus
+only: 52 of 104 held-out edits missed against 8 for the margin map.)
+
+Broken out, at threshold 9:
+
+| Split | Fixed window | Density-sized |
+|---|---|---|
+| Advices, development | 5 of 65 missed | 5 of 65 |
+| Advices, held out | 6 of 104 | 6 of 104 |
+| Letters, development | 18 of 21 | **2 of 21** |
+| Letters, held out | 32 of 42 | **14 of 42** |
+
+Advices are untouched — on a dense page the sizing reduces to the window it replaced — and
+the large pages, where the detector was effectively blind, improve by more than half.
+
+Honest journeys across all four splits reach 8 at the very worst, a sharpened copy, so
+nine is the lowest threshold that accuses nobody. Eight was measured too: it buys ten
+edits and costs one false accusation, and was not taken.
+
+What still gets through is small and specific: a single digit replaced by a same-width
+glyph, and two-character edits on the largest pages. Redrawn text restores the contrast the
+margin is read from, so those blocks go back to a coin toss. Every edit of a whole printed
+value — an amount, a name, a date, a reference number — is caught on every page size tested.
 
 **Region localisation** — 1 edit gives 1 box, 2 give 2, 3 give 3, each on the field that
 was actually repainted.
