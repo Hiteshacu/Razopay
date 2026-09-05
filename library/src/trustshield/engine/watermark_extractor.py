@@ -39,6 +39,7 @@ try:
         watermark_payload_bit_length,
         watermark_permutation,
         watermark_repetition,
+        watermark_repetition_candidates,
     )
 except ImportError:
     from utils import (
@@ -59,6 +60,7 @@ except ImportError:
         watermark_payload_bit_length,
         watermark_permutation,
         watermark_repetition,
+        watermark_repetition_candidates,
     )
 
 
@@ -184,7 +186,6 @@ def _extract_watermark_bundle_from_array(
     payload_bits = watermark_payload_bit_length()
     blocks_per_row = luminance.shape[1] // BLOCK_SIZE
     total_blocks = (luminance.shape[0] // BLOCK_SIZE) * blocks_per_row
-    repetition = watermark_repetition(total_blocks, payload_bits)
     if total_blocks < payload_bits:
         raise ValueError("Poster is too small to contain a valid watermark.")
 
@@ -196,21 +197,28 @@ def _extract_watermark_bundle_from_array(
     active_coefficient_layouts = coefficient_layouts or WATERMARK_EXTRACT_COEFFICIENT_LAYOUTS
     for coefficient_pairs in active_coefficient_layouts:
         votes_per_block, votes_per_pair = _votes_per_block(luminance, coefficient_pairs)
-        total_votes = votes_per_pair * repetition
-        for permutation in permutations:
-            try:
-                votes = _gather_bit_votes(votes_per_block, permutation, payload_bits, repetition)
-                recovered_bits = (votes > (total_votes / 2.0)).astype(np.uint8)
+        # How many copies were written decides which block holds which bit, so
+        # a reader guessing wrong recovers noise rather than a near miss. Two
+        # counts have ever been written: what this release writes, and the
+        # eleven-copy cap that came before it. On a page small enough that
+        # eleven was the whole capacity they are the same number and only one
+        # is tried.
+        for repetition in watermark_repetition_candidates(total_blocks, payload_bits):
+            total_votes = votes_per_pair * repetition
+            for permutation in permutations:
+                try:
+                    votes = _gather_bit_votes(votes_per_block, permutation, payload_bits, repetition)
+                    recovered_bits = (votes > (total_votes / 2.0)).astype(np.uint8)
 
-                payload = bits_to_bytes(recovered_bits.tolist())
-                fingerprint, signature = parse_watermark_payload(payload)
-                if len(fingerprint) != REFERENCE_FINGERPRINT_BYTES:
-                    raise ValueError("Recovered fingerprint length does not match the expected size.")
-                if len(signature) != RSA_SIGNATURE_BYTES:
-                    raise ValueError("Recovered signature length does not match the expected RSA key size.")
-                return fingerprint, signature_to_base64(signature)
-            except Exception as exc:
-                last_error = exc
+                    payload = bits_to_bytes(recovered_bits.tolist())
+                    fingerprint, signature = parse_watermark_payload(payload)
+                    if len(fingerprint) != REFERENCE_FINGERPRINT_BYTES:
+                        raise ValueError("Recovered fingerprint length does not match the expected size.")
+                    if len(signature) != RSA_SIGNATURE_BYTES:
+                        raise ValueError("Recovered signature length does not match the expected RSA key size.")
+                    return fingerprint, signature_to_base64(signature)
+                except Exception as exc:
+                    last_error = exc
 
     if last_error is not None:
         raise last_error
@@ -253,7 +261,6 @@ def watermark_payload_correlation(
 
     blocks_per_row = luminance.shape[1] // BLOCK_SIZE
     total_blocks = (luminance.shape[0] // BLOCK_SIZE) * blocks_per_row
-    repetition = watermark_repetition(total_blocks, payload_bits)
     if total_blocks < payload_bits:
         raise ValueError("Image is too small to compare against the expected watermark.")
 
@@ -266,23 +273,26 @@ def watermark_payload_correlation(
     active_coefficient_layouts = coefficient_layouts or WATERMARK_EXTRACT_COEFFICIENT_LAYOUTS
     for coefficient_pairs in active_coefficient_layouts:
         votes_per_block, votes_per_pair = _votes_per_block(luminance, coefficient_pairs)
-        total_votes = votes_per_pair * repetition
-        half_votes = total_votes / 2.0
-        for permutation in permutations:
-            votes = _gather_bit_votes(votes_per_block, permutation, payload_bits, repetition)[start:end]
-            wanted = expected_bits[start:end].astype(np.int32)
+        # Same two candidates as the bundle reader, and the same reason: this
+        # is what recovers a registered document signed before the cap moved.
+        for repetition in watermark_repetition_candidates(total_blocks, payload_bits):
+            total_votes = votes_per_pair * repetition
+            half_votes = total_votes / 2.0
+            for permutation in permutations:
+                votes = _gather_bit_votes(votes_per_block, permutation, payload_bits, repetition)[start:end]
+                wanted = expected_bits[start:end].astype(np.int32)
 
-            recovered = (votes > half_votes).astype(np.int32)
-            agreement = float(np.count_nonzero(recovered == wanted)) / float(end - start)
+                recovered = (votes > half_votes).astype(np.int32)
+                agreement = float(np.count_nonzero(recovered == wanted)) / float(end - start)
 
-            raw_margin = (votes - half_votes) / half_votes
-            # A bit expected to be 1 should lean positive and a 0 negative, so
-            # flip the sign on zero bits before averaging.
-            signed_margin = float(np.mean(np.where(wanted == 1, raw_margin, -raw_margin)))
+                raw_margin = (votes - half_votes) / half_votes
+                # A bit expected to be 1 should lean positive and a 0 negative,
+                # so flip the sign on zero bits before averaging.
+                signed_margin = float(np.mean(np.where(wanted == 1, raw_margin, -raw_margin)))
 
-            if (agreement, signed_margin) > (best_agreement, best_signed_margin):
-                best_agreement = agreement
-                best_signed_margin = signed_margin
+                if (agreement, signed_margin) > (best_agreement, best_signed_margin):
+                    best_agreement = agreement
+                    best_signed_margin = signed_margin
 
     return best_agreement, best_signed_margin
 

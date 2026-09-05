@@ -78,7 +78,16 @@ WATERMARK_EXTRACT_COEFFICIENT_LAYOUTS = (
 # read from, and no amount of amplitude repairs a grid that has moved.
 AUTO_EMBED_STRENGTHS = (36.0, 48.0)
 BASE_EMBED_STRENGTH = AUTO_EMBED_STRENGTHS[0]
-MAX_REPETITION = 11
+#: The repetition cap that signed every document up to April 2026.
+#:
+#: Kept because it is the only way to read those documents back: how many times
+#: the payload was written decides which blocks carry which bit, so a reader
+#: using the wrong count recovers noise. Never write with it.
+LEGACY_MAX_REPETITION = 11
+
+#: Deprecated alias. Nothing should read this; it survives so an old checkout
+#: or a vendored copy importing it does not fail on import.
+MAX_REPETITION = LEGACY_MAX_REPETITION
 PAYLOAD_VERSION = 2
 REFERENCE_FINGERPRINT_BYTES = 16
 DHASH_BITS = 64
@@ -1078,12 +1087,52 @@ def watermark_payload_bit_length() -> int:
     ) * 8
 
 
-def watermark_repetition(total_blocks: int, payload_bits: int) -> int:
-    """Use the largest odd repetition count that fits in the image capacity."""
-    repetition = min(MAX_REPETITION, total_blocks // payload_bits)
+def watermark_repetition(
+    total_blocks: int,
+    payload_bits: int,
+    max_repetition: int | None = None,
+) -> int:
+    """The largest odd repetition count that fits, capped only if asked.
+
+    The cap used to be eleven, always, and on a small page that is the whole
+    capacity anyway — a 1000x1400 payout advice fits nine copies and writes
+    nine. On anything larger it threw the rest away: a 1400x1750 scan fits
+    sixteen and wrote eleven, a 2000x2600 photograph fits thirty-five and still
+    wrote eleven, leaving 69% of its blocks carrying nothing at all.
+
+    That is not a robustness question, it is a localisation one. A block that
+    carries no bit cannot report damage, so on a large page two thirds of every
+    edit was invisible by construction — and which third showed depends on
+    where the permutation happened to put the carriers, which is why the same
+    edit on the same page detected or did not detect depending on the salt in
+    the signature. Measured: one date changed on one letter, signed eight
+    times, gave largest patches of 6, 8, 8, 10, 10, 14, 16, 17.
+
+    Uncapped, the same page carries a bit in every block it has room for, and
+    the sample under any given edit grows with it.
+
+    Pass LEGACY_MAX_REPETITION to read a document signed before this changed.
+    """
+    repetition = total_blocks // payload_bits
+    if max_repetition is not None:
+        repetition = min(max_repetition, repetition)
     if repetition > 1 and repetition % 2 == 0:
         repetition -= 1
     return max(1, repetition)
+
+
+def watermark_repetition_candidates(total_blocks: int, payload_bits: int) -> tuple[int, ...]:
+    """Repetition counts to try when reading, best guess first.
+
+    Two, and only ever two: what this release writes, and what every release
+    before it wrote. They are the same number whenever the page is small enough
+    that eleven copies was already the whole capacity, which is most pages that
+    have been signed so far — so on those this costs nothing and the second
+    candidate is never tried.
+    """
+    current = watermark_repetition(total_blocks, payload_bits)
+    legacy = watermark_repetition(total_blocks, payload_bits, LEGACY_MAX_REPETITION)
+    return (current,) if current == legacy else (current, legacy)
 
 
 def legacy_watermark_permutation(total_blocks: int) -> np.ndarray:

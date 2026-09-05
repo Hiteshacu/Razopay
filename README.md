@@ -89,89 +89,79 @@ brightened or heavily recompressed copy is compared with itself rather than with
 absolute number.
 
 One more thing decides whether that works, and it only shows up on real documents. The
-payload is repeated at most eleven times however large the page is, so the share of blocks
-carrying a bit at all falls as the page grows:
+payload was repeated **at most 11 times whatever the page size**, so the share of blocks
+carrying a bit at all fell as the page grew — and a block carrying no bit cannot report
+damage:
 
-| Page | Blocks | Carry a bit |
-|---|---|---|
-| Payout advice, 1000×1400 | 21,875 | **93%** |
-| Scanned letter, 1400×1750 | 38,150 | **65%** |
-| Phone photo of one, 2000×2600 | 81,250 | **31%** |
+| Page | Blocks | Carried a bit | Now |
+|---|---|---|---|
+| Payout advice, 1000×1400 | 21,875 | 93% | 93% |
+| Scanned letter, 1400×1750 | 38,150 | 66% | **89%** |
+| Phone photo of one, 2000×2600 | 81,250 | 31% | **98%** |
 
-A fixed window asking "are all four of my neighbours damaged?" reads every block carrying
-nothing as a block that is fine. On a large page an edit therefore arrives as a sieve and
-dissolves — 32 of 42 letter edits went through that way. So the window grows until it
-expects to hold as many carriers as it held on the page the thresholds were measured on,
-and only blocks carrying a bit are allowed to vote. What reconnects the pieces afterwards
-stays fixed, because that is a reconnection and not a measurement.
+Two thirds of every edit on a large page was invisible by construction, and *which* third
+showed depended on where the permutation happened to put the carriers. Since RSA-PSS salts
+every signature, that made detection a coin flip: one date changed on one letter, signed
+eight times, gave largest patches of 6, 8, 8, 10, 10, 14, 16, 17 — over the line five times
+out of eight.
+
+The cap is gone. A page now carries a bit in every block it has room for, and a reader tries
+both counts, so documents signed before this still verify. Same test, after: **15, 19, 22,
+23, 25, 38, 45, 45 — eight out of eight**, against 0 for every untouched copy.
+
+Two further things follow from the geometry. A window asking *"is this patch solid?"* has to
+grow as the share of carriers falls, or it reads a block holding nothing as a block that is
+fine. And it has to ask for **enough** flattened carriers and for **a solid share** of them
+as two separate conditions — as one condition ("all of them"), giving a page more bits to
+carry made it strictly harder to pass, so raising the capacity made detection worse before it
+made it better.
 
 ## Measured results
 
 Held-out evaluation split (seed 5000); thresholds were fixed on a development split
 (seed 1000) and never refitted.
 
-**Carrier tamper detection.** Two corpora, each split into a development set the
-thresholds were fixed on and a held-out set they were never refitted against: payout
-advices at 1000×1400, and scanned-letter pages at 1400×1750 through 2000×2500.
+**Carrier tamper detection.** Two corpora, each split into a development set the thresholds
+were fixed on and a held-out set they were never refitted against: payout advices at
+1000×1400, and scanned-letter pages at 1400×1750 through 2000×2500. 198 honest copies,
+232 edits.
 
 | Detector | False accusations | Missed edits |
 |---|---|---|
-| Margin collapse, fixed window | 0 of 198 | 61 of 232 |
-| Margin collapse, window sized to carrier density | **0 of 198** | **27 of 232** |
+| Fixed window, 11-copy cap | 0 of 198 | 61 of 232 |
+| Window sized to carrier density | 0 of 198 | 23 of 232 |
+| Full capacity, evidence and solidity split | **0 of 198** | **11 of 232** |
 
-(Sign disagreement, the detector before either of these, was measured on the advice corpus
-only: 52 of 104 held-out edits missed against 8 for the margin map.)
+Per split for the last of those: advices 4 of 65 and 5 of 104; letters 0 of 21 and 2 of 42.
 
-Broken out, at threshold 9:
+The threshold is 12, the worst honest journey plus one — a sharpened advice reaches 11. That
+is tighter than a threshold should sit, and 13 is where it would sit if there were a choice.
+There is not: a run of edits land on exactly 12, so 13 turns 11 misses into 39. The cliff
+decides it, and it is recorded rather than smoothed over.
 
-| Split | Fixed window | Density-sized |
-|---|---|---|
-| Advices, development | 5 of 65 missed | 5 of 65 |
-| Advices, held out | 6 of 104 | 6 of 104 |
-| Letters, development | 18 of 21 | **2 of 21** |
-| Letters, held out | 32 of 42 | **14 of 42** |
+**On spread.** RSA-PSS salts every signature, so signing the same page twice puts a different
+set of blocks in charge of the proof, and every count here moves a little between runs. That
+used to decide outcomes. With the page carrying every bit it has room for it no longer does,
+but these are measurements rather than constants.
 
-Advices are untouched — on a dense page the sizing reduces to the window it replaced — and
-the large pages, where the detector was effectively blind, improve by more than half.
-
-Honest journeys across all four splits reach 8 at the very worst, a sharpened copy, so
-nine is the lowest threshold that accuses nobody. Eight was measured too: it buys ten
-edits and costs one false accusation, and was not taken.
-
-What still gets through is small and specific: a single digit replaced by a same-width
-glyph, and two-character edits on the largest pages. Redrawn text restores the contrast the
-margin is read from, so those blocks go back to a coin toss.
-
-**These numbers have real spread in them, and it is worth stating plainly.** RSA-PSS salts
-every signature, so signing the same page twice puts a different set of blocks in charge of
-carrying the proof. Signing one letter eight times and making the *same* single-date edit
-each time gives largest patches of 6, 8, 8, 10, 10, 14, 16, 17 — against 0 to 6 for
-untouched and sharpened copies of those same eight. Above the threshold five times out of
-eight. The edit is real every time; whether it is *visible* depends on which blocks happened
-to carry a bit next to it.
-
-So: an edit to a whole printed value on a page the size of a payout advice is caught
-reliably. A single small field on a large scan is not yet reliable, and the honest fix is
-not a lower threshold but more carrier — the payload is repeated at most 11 times whatever
-the page size, which leaves 69% of a 2000×2600 scan carrying nothing at all.
-
-**Page-wide damage is named rather than drawn.** An online image-text editor runs OCR over
-a page, erases the text it finds and redraws it. Measured, that covers 38–67% of the page in
-6–10 regions, where honest journeys cover at most 1% in at most 2 and even the largest
-single edit covers 14% in 2. Above 20% in 3 or more regions the verdict says the page has
-been through an editor and asks for the original file, instead of painting it orange —
-because at the pixel level an editor redrawing a line unchanged and a forger changing one
-are the same act, and nothing in the signature can separate them.
+**Page-wide damage is named rather than drawn.** An online image-text editor runs OCR over a
+page, erases the text it finds and redraws it. Measured, that leaves 68–100% of the page
+inside a region, where honest journeys reach 6% and even the largest single edit — a doubled
+amount repainting both the headline and the table row — reaches 15%. Above 35% the verdict
+says the page has been through an editor and asks for the original file, instead of painting
+it orange. It cannot do better than name it: at the pixel level, an editor redrawing a line
+unchanged and a forger changing one are the same act, and nothing in the signature separates
+them.
 
 **Region localisation** — 1 edit gives 1 box, 2 give 2, 3 give 3, each on the field that
 was actually repainted.
 
-**Payout advice benchmark** (`python -m razorpayx.cli benchmark --advices 8 --seed 5000`)
+**Payout advice benchmark** (`python -m razorpayx.cli benchmark --advices 4 --seed 5000`)
 
 ```
-Forgeries rejected     152 / 152     recall     1.000
-Falsely accused          0 / 80      precision  1.000
-Genuine passed          72 / 80      FPR        0.000
+Forgeries rejected      76 / 76      recall     1.000
+Falsely accused          0 / 40      precision  1.000
+Genuine passed          36 / 40      FPR        0.000
 ```
 
 **Payslips** — the same detector, unchanged: genuine slips pass, and erasing one digit of
@@ -227,7 +217,7 @@ npm run dev                                        # http://localhost:5173
 **Run the benchmark yourself:**
 
 ```bash
-python -m razorpayx.cli benchmark --advices 8 --seed 5000 --detail
+python -m razorpayx.cli benchmark --advices 4 --seed 5000 --detail
 ```
 
 ## Architecture

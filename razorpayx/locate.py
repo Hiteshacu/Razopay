@@ -51,21 +51,19 @@ innocence, and a small edit falls apart inside it. The window is therefore
 sized to the page's carrier density, which leaves dense pages exactly as they
 were and halves the misses on large ones.
 
-There is a floor under all of this, and on a large page a small edit sits on
-it. RSA-PSS salts every signature, so signing one page twice writes two
-different payloads into it and a different set of blocks ends up carrying each
-bit. Signing the same letter eight times and making the same one-date edit each
-time gives largest patches of 6, 8, 8, 10, 10, 14, 16 and 17, against 0 to 6 for
-the untouched and sharpened copies of those same eight. The edit is real every
-time; whether it clears the threshold depends on which blocks happened to carry
-a bit near it. Anything smaller than a printed value is therefore a coin weighted
-by the signing, not a measurement, and the numbers quoted here have that spread
-in them.
+There was a floor under all of this, and on a large page a small edit sat on it.
+The payload used to be repeated at most eleven times whatever the page size, so
+a 2000x2600 scan left 69% of its blocks carrying nothing, and a block carrying
+nothing cannot report damage. Which part of an edit showed therefore depended on
+where the permutation happened to put the carriers — and since RSA-PSS salts
+every signature, that made it luck. Signing one letter eight times and making
+the same one-date edit each time gave largest patches of 6, 8, 8, 10, 10, 14, 16
+and 17: over the line five times in eight.
 
-The fix for that is not a threshold. It is carrying more bits on a large page:
-the payload is repeated at most MAX_REPETITION times whatever the page size, so
-a 2000x2600 scan leaves 69% of its blocks empty. Raising that cap changes how
-every already-signed document reads back, so it needs a reader that tries both.
+The cap is gone, a page carries a bit in every block it has room for, and the
+reader tries both counts so older documents still verify. The same eight runs
+now give 15, 19, 22, 23, 25, 38, 45 and 45, against 0 for every untouched copy.
+The spread is still there — it is the salt — but it no longer decides anything.
 
 What it cannot do is read a page whose payload will not come back — a heavy
 downscale, or a messaging-app re-encode, where recovery needs the registry
@@ -158,23 +156,37 @@ def carrier_margin(image: np.ndarray, payload_bits: np.ndarray) -> np.ndarray:
     total = rows * cols
 
     permutation = u.watermark_permutation(total)
-    repetition = u.watermark_repetition(total, payload_bits.size)
-    carriers = permutation[: repetition * payload_bits.size].reshape(repetition, payload_bits.size)
 
-    # True where the payload wants the first coefficient of the pair to be the
-    # larger one, which is exactly the convention the embedder writes under.
-    wants_a_larger = payload_bits[None, :].repeat(repetition, axis=0).astype(bool)
+    # How many copies were written is not recorded anywhere in the image, and
+    # it decides which block holds which bit — so the wrong count does not
+    # degrade the answer, it randomises it. The page settles the question
+    # itself: read under the right count the margins sit around the embedding
+    # strength, and under the wrong one they scatter around zero, so the
+    # candidate with the larger median is the one the page was written with.
+    # There is nothing to tune here; the two are an order of magnitude apart.
+    best_grid = None
+    best_median = -np.inf
+    for repetition in u.watermark_repetition_candidates(total, payload_bits.size):
+        carriers = permutation[: repetition * payload_bits.size].reshape(repetition, payload_bits.size)
 
-    gaps = np.zeros(carriers.shape, dtype=np.float32)
-    for (a_row, a_col), (b_row, b_col) in u.WATERMARK_EMBED_COEFFICIENT_PAIRS:
-        a = coefficients[:, a_row, a_col][carriers]
-        b = coefficients[:, b_row, b_col][carriers]
-        gaps += np.where(wants_a_larger, a - b, b - a)
-    gaps /= len(u.WATERMARK_EMBED_COEFFICIENT_PAIRS)
+        # True where the payload wants the first coefficient of the pair to be
+        # the larger one, which is the convention the embedder writes under.
+        wants_a_larger = payload_bits[None, :].repeat(repetition, axis=0).astype(bool)
 
-    grid = np.full(total, np.nan, dtype=np.float32)
-    grid[carriers.ravel()] = gaps.ravel()
-    return grid.reshape(rows, cols)
+        gaps = np.zeros(carriers.shape, dtype=np.float32)
+        for (a_row, a_col), (b_row, b_col) in u.WATERMARK_EMBED_COEFFICIENT_PAIRS:
+            a = coefficients[:, a_row, a_col][carriers]
+            b = coefficients[:, b_row, b_col][carriers]
+            gaps += np.where(wants_a_larger, a - b, b - a)
+        gaps /= len(u.WATERMARK_EMBED_COEFFICIENT_PAIRS)
+
+        grid = np.full(total, np.nan, dtype=np.float32)
+        grid[carriers.ravel()] = gaps.ravel()
+        median = float(np.nanmedian(grid))
+        if median > best_median:
+            best_median, best_grid = median, grid
+
+    return best_grid.reshape(rows, cols)
 
 
 #: A block is called weak when its margin falls below this fraction of the
@@ -227,18 +239,30 @@ def carrier_weakness(
     return weak.astype(np.uint8), written.astype(np.uint8), page_margin
 
 
-#: How many blocks carrying a bit an opening window has to hold before the
-#: patch under it counts as solid rather than as scatter.
-#:
-#: Four, because that is what a 2x2 opening asked for on the page this was
-#: first measured on, and the point of the window sizing below is to keep
-#: asking for the same thing as the page grows.
-MIN_CORE_CARRIERS = 4
+#: How many flattened carriers a window must hold before the patch under it
+#: counts as solid rather than as scatter.
+MIN_CORE_CARRIERS = 6
 
-#: Expected carriers a window must hold before it is wide enough. Sized so a
-#: page like the payout advice, where 93.5% of blocks carry a bit, still gets
-#: the 2x2 window every threshold here was measured against.
-_WINDOW_CARRIER_TARGET = 3.7
+#: And what share of the carriers under that window they have to be.
+#:
+#: These two were one condition until the capacity changed, and that is worth
+#: recording because the bug it caused was invisible and backwards. The rule
+#: was "every carrier under the window is weak", which on a page carrying four
+#: of them under a window is the same as asking for four. Give the page more
+#: bits to carry and the same window holds eight — and asking for all eight is
+#: a strictly harder question than asking for all four. So raising the carrier
+#: capacity, which exists to make small edits easier to see, made them harder:
+#: measured on the same letter and the same date edit, detection went from five
+#: runs in eight to three.
+#:
+#: Split apart, "enough evidence" and "the window is solid" stop fighting.
+#: Sweeping both against 198 honest copies and 232 edits over two page shapes
+#: and both their splits, six carriers at 65% is the best point that accuses
+#: nobody: 11 misses, against 23 for the single all-of-them rule.
+CORE_WEAK_FRACTION = 0.65
+
+#: Expected carriers a window must hold before it is wide enough.
+_WINDOW_CARRIER_TARGET = 5.0
 
 
 def opened_weak(weak: np.ndarray, written: np.ndarray) -> tuple[np.ndarray, float]:
@@ -259,12 +283,13 @@ def opened_weak(weak: np.ndarray, written: np.ndarray) -> tuple[np.ndarray, floa
     of 42 on the held-out one, and the ones that survived did so at the
     smallest size.
 
-    So the window grows until it expects to hold as many carriers as a 2x2
-    window held on the page this was calibrated on, and only blocks carrying a
-    bit are allowed to vote. A window passes when every carrier under it is
-    weak and there are at least MIN_CORE_CARRIERS of them, which on a dense
-    page is exactly the old rule and on a sparse one is the same question asked
-    over a wider patch of paper.
+    So the window grows with the page until it expects to hold a set number of
+    carriers, and only blocks carrying a bit are allowed to vote. A window
+    passes when at least MIN_CORE_CARRIERS of them are flattened and they are
+    at least CORE_WEAK_FRACTION of everything carrying a bit under it — enough
+    evidence, and a solid patch, as two conditions rather than one. They were
+    one, and see CORE_WEAK_FRACTION for the way that quietly punished a page
+    for carrying more bits.
 
     Only the window that decides whether a patch is solid grows with the page.
     What puts the patch back together afterwards stays a 2x2, because that is a
@@ -293,7 +318,8 @@ def opened_weak(weak: np.ndarray, written: np.ndarray) -> tuple[np.ndarray, floa
     weak_near = cv2.filter2D(weak.astype(np.float32), -1, kernel,
                              borderType=cv2.BORDER_CONSTANT)
 
-    core = ((carriers_near >= MIN_CORE_CARRIERS) & (weak_near >= carriers_near))
+    core = ((weak_near >= MIN_CORE_CARRIERS)
+            & (weak_near >= CORE_WEAK_FRACTION * carriers_near))
     reconnect = np.ones((2, 2), np.uint8)
     return cv2.dilate(core.astype(np.uint8), reconnect), density
 
@@ -315,15 +341,25 @@ def disagreement_map(image: np.ndarray, payload_bits: np.ndarray) -> np.ndarray:
     total = rows * cols
 
     permutation = u.watermark_permutation(total)
-    repetition = u.watermark_repetition(total, payload_bits.size)
-    carriers = permutation[: repetition * payload_bits.size].reshape(repetition, payload_bits.size)
 
-    expected = payload_bits[None, :].repeat(repetition, axis=0).astype(bool)
-    disagrees = (votes[carriers] > votes_per_pair / 2) != expected
+    # Same two candidates as carrier_margin, chosen the same way: under the
+    # right repetition almost every block agrees, under the wrong one about
+    # half do, so the lower disagreement rate names the one that was written.
+    best_grid = None
+    best_rate = np.inf
+    for repetition in u.watermark_repetition_candidates(total, payload_bits.size):
+        carriers = permutation[: repetition * payload_bits.size].reshape(repetition, payload_bits.size)
 
-    grid = np.zeros(total, dtype=np.float32)
-    grid[carriers.ravel()] = disagrees.ravel().astype(np.float32)
-    return grid.reshape(rows, cols)
+        expected = payload_bits[None, :].repeat(repetition, axis=0).astype(bool)
+        disagrees = (votes[carriers] > votes_per_pair / 2) != expected
+
+        grid = np.zeros(total, dtype=np.float32)
+        grid[carriers.ravel()] = disagrees.ravel().astype(np.float32)
+        rate = float(disagrees.mean())
+        if rate < best_rate:
+            best_rate, best_grid = rate, grid
+
+    return best_grid.reshape(rows, cols)
 
 
 #: A connected patch smaller than this is not reported as a region.
@@ -522,16 +558,20 @@ def payload_bits_for(image: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
 #: Largest connected patch of weakened carrier blocks, after the opening, at or
 #: above which a page is called edited.
 #:
-#: Nine, measured over two corpora at once and on both their splits: payout
-#: advices at 1000x1400, where 93% of blocks carry a bit, and scanned-letter
-#: pages at 1400x1750 through 2000x2500, where a third or less do. Honest
-#: journeys across all four reach 8 at the very worst — a sharpened copy — and
-#: nine is the lowest value that accuses none of them.
+#: Twelve, measured over two corpora at once and on both their splits: payout
+#: advices at 1000x1400 and scanned-letter pages at 1400x1750 through
+#: 2000x2500. Honest journeys across all four reach 11 at the very worst — a
+#: sharpened advice — and twelve is the lowest value that accuses none of them.
 #:
-#: Eight was measured too. It costs one false accusation, on a sharpened advice,
-#: and buys ten edits. Not taken: the errors are not equal, and the rule below
-#: about which way this moves was written before there was a case for breaking
-#: it.
+#: It is honest-max-plus-one with no head room, which is not where a threshold
+#: should sit, and thirteen is where it would sit if there were a choice. There
+#: is not: a run of edits land on exactly twelve, so thirteen turns 11 misses
+#: into 39. The cliff decides it.
+#:
+#: The number has moved with every change to the signal under it — 7 for sign
+#: disagreement, 9 for the margin map, now 12 once a large page carries every
+#: bit it has room for and the core rule stopped asking more of it for doing
+#: so. It is not comparable across those; only the miss counts are.
 #:
 #: The number has moved twice, each time because the signal under it changed.
 #: It was 7 against sign disagreement, which let 33 of 65 measurable edits
@@ -546,28 +586,25 @@ def payload_bits_for(image: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
 #: If it has to move again it should move up. The two errors are not equal:
 #: missing a smaller edit costs one consignment of goods, while calling an
 #: honest payer's advice forged costs them the customer they were paying.
-EDIT_BLOB_THRESHOLD = 9
+EDIT_BLOB_THRESHOLD = 12
 
-#: Share of the page inside reported regions, and how many regions, above which
-#: the damage stops being an edit to part of a page and becomes something that
-#: happened to all of it.
+#: Share of the page inside a reported region above which the damage stops
+#: being an edit to part of a page and becomes something done to all of it.
 #:
-#: Both conditions together, because either alone misfires. A single repainted
-#: headline amount on a small advice covers 10% of it, which is why coverage
-#: alone cannot be the test; an honest page occasionally produces two specks,
-#: which is why a count alone cannot be either.
+#: Measured through the same path a caller uses, as a union of the boxes rather
+#: than a sum of them. Honest journeys cover at most 6%. Local edits reach 15% —
+#: a doubled headline amount repaints both the hero and the table row of a small
+#: advice. A page an online "image text editor" has re-typeset covers 68% to
+#: 100%. Thirty-five per cent sits in the middle of a gap four times wider than
+#: either population.
 #:
-#: Measured through the same path a caller uses. Honest journeys cover at most
-#: 1% in at most 2 regions. Local edits reach 14.2% — a doubled headline amount
-#: repaints both the hero and the table row of a small advice — but never in
-#: more than 2 regions. A page an online "image text editor" has re-typeset
-#: covers 38% to 67% in 6 to 10 regions.
-#:
-#: The coverage bar sits at 20% rather than just above 14.2% because the two
-#: populations are far apart there and the cost of being wrong is asymmetric:
-#: calling a real edit page-wide would soften language that should stay sharp.
-PAGE_WIDE_COVERAGE = 0.20
-PAGE_WIDE_REGIONS = 3
+#: A count of regions was part of this test and has been dropped. It looked
+#: safe — re-typeset pages produced 6 to 10 boxes against at most 2 for an edit
+#: — and then the core rule improved, the fragments of a re-typeset page merged
+#: into two or three big boxes, and the count silently stopped firing on exactly
+#: the pages it was there for. Coverage says the same thing without depending on
+#: how the damage happens to be cut up.
+PAGE_WIDE_COVERAGE = 0.35
 
 
 @dataclass(frozen=True)
@@ -618,9 +655,30 @@ class CarrierFinding:
         the same act on the same pixels. What can be said is that the page is
         no longer the one that was signed, which is the answer either way.
         """
-        return (self.edited
-                and len(self.regions) >= PAGE_WIDE_REGIONS
-                and self.coverage >= PAGE_WIDE_COVERAGE)
+        return self.edited and self.coverage >= PAGE_WIDE_COVERAGE
+
+
+def _coverage(regions: tuple[Region, ...], width: int, height: int) -> float:
+    """Share of the page inside at least one region.
+
+    The union, not the sum of the boxes. Summing was the first version and it
+    reported 104% of a page — boxes that have been merged along a line still
+    overlap where they meet, and a number above 100% is a number nobody can
+    reason about.
+    """
+    if not regions or width <= 0 or height <= 0:
+        return 0.0
+    rows = max(1, height // u.BLOCK_SIZE)
+    cols = max(1, width // u.BLOCK_SIZE)
+    mask = np.zeros((rows, cols), dtype=bool)
+    for r in regions:
+        top = max(0, r.top // u.BLOCK_SIZE)
+        bottom = min(rows, -(-r.bottom // u.BLOCK_SIZE))
+        left = max(0, r.left // u.BLOCK_SIZE)
+        right = min(cols, -(-r.right // u.BLOCK_SIZE))
+        if bottom > top and right > left:
+            mask[top:bottom, left:right] = True
+    return float(mask.mean())
 
 
 def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFinding:
@@ -669,8 +727,6 @@ def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFindin
 
     height, width = read_image.shape[:2]
     regions = tuple(locate_all(read_image, bits))
-    page_area = float(width * height)
-    covered = sum((r.right - r.left) * (r.bottom - r.top) for r in regions)
     return CarrierFinding(
         measurable=True,
         blob=blob,
@@ -678,7 +734,7 @@ def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFindin
         regions=regions,
         read_width=int(width),
         read_height=int(height),
-        coverage=(covered / page_area) if page_area else 0.0,
+        coverage=_coverage(regions, width, height),
     )
 
 
