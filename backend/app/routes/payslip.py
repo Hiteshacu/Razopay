@@ -24,8 +24,6 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
@@ -37,8 +35,9 @@ from ..services.firebase_service import FirebaseService
 
 router = APIRouter(prefix="/api/payslip", tags=["payslip"])
 
-# Its own key pair, beside the runtime data. Not an operator's authority key:
-# these are signed on RazorpayX Payroll's behalf, not on any one operator's.
+# Its own key pair. Not an operator's authority key: these are signed on
+# RazorpayX Payroll's behalf, not on any one operator's. This directory only
+# caches it for the life of the container — see services/demo_keys.
 _SLIP_DIR = settings.local_upload_root / "payslip_demo"
 
 _AUTHORITY_ID = "razorpayx_payroll"
@@ -46,17 +45,15 @@ _AUTHORITY_NAME = "RazorpayX Payroll"
 
 
 def _keys() -> tuple[Path, Path]:
-    _SLIP_DIR.mkdir(parents=True, exist_ok=True)
-    private, public = _SLIP_DIR / "priv.pem", _SLIP_DIR / "pub.pem"
-    if not private.exists():
-        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        private.write_bytes(key.private_bytes(
-            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-            serialization.NoEncryption()))
-        public.write_bytes(key.public_key().public_bytes(
-            serialization.Encoding.PEM,
-            serialization.PublicFormat.SubjectPublicKeyInfo))
-    return private, public
+    """The payroll demo pair, from durable storage rather than this container.
+
+    Same reason as the payout advice: a pair generated onto a container
+    filesystem lasts until the next deploy, and every payslip signed with it
+    then reads as never issued. See services/demo_keys.
+    """
+    from ..services.demo_keys import demo_key_pair
+
+    return demo_key_pair(_AUTHORITY_ID, _SLIP_DIR)
 
 
 def _paise(value: str, field: str) -> int:
@@ -221,9 +218,38 @@ async def payslip_image(slip_id: str):
     """
     safe = "".join(ch for ch in slip_id if ch.isalnum() or ch == "_")
     path = _SLIP_DIR / "issued" / f"{safe}.png"
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="No such payslip.")
-    return FileResponse(path, media_type="image/png", filename=f"{safe}.png")
+    if path.is_file():
+        return FileResponse(path, media_type="image/png", filename=f"{safe}.png")
+    return _from_object_store(safe, f"{safe}.png", _AUTHORITY_ID, "payslip")
+
+
+def _from_object_store(document_id: str, filename: str, authority_id: str, label: str):
+    """The same page, from where it was filed, once the container has moved on.
+
+    The issued directory is the container's own disk, so a link to it survives
+    exactly as long as the container does — reload the page after a deploy and
+    a document that plainly exists answers 404. Every issued document is also
+    put in the object store at signing time, which is durable, so that is where
+    to look second.
+    """
+    from fastapi.responses import StreamingResponse
+
+    key = f"signed_documents/{authority_id}/{document_id}/{filename}"
+    try:
+        chunks = get_document_store().stream(key)
+        # stream() is a generator, so a missing object does not fail until the
+        # first read. Taking that read here turns it into a clean 404 rather
+        # than a 200 that breaks halfway through the image.
+        first = next(chunks, b"")
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"No such {label}.") from exc
+
+    def body():
+        yield first
+        yield from chunks
+
+    return StreamingResponse(body(), media_type="image/png",
+                             headers={"Content-Disposition": f'inline; filename="{filename}"'})
 
 
 def _check_from_signature(upload: Path, public_pem: Path, label: str) -> dict:

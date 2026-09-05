@@ -26,8 +26,6 @@ if str(_PROJECT_ROOT) not in sys.path:
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
@@ -39,25 +37,25 @@ from ..services.firebase_service import FirebaseService
 
 router = APIRouter(prefix="/api/payout-advice", tags=["payout-advice"])
 
-# The demo signs with its own key pair, kept beside the runtime data so it
-# survives a redeploy on a mounted disk. It is deliberately not an operator's
+# The demo signs with its own key pair, deliberately not an operator's
 # authority key: this endpoint is open, and nothing reachable without
-# authentication should be able to sign with a real authority's key.
+# authentication should be able to sign with a real authority's key. This
+# directory is only where the pair is cached for the life of the container —
+# where it actually lives is services/demo_keys.
 _DEMO_DIR = settings.local_upload_root / "payout_demo"
 
 
 def _keys() -> tuple[Path, Path]:
-    _DEMO_DIR.mkdir(parents=True, exist_ok=True)
-    private, public = _DEMO_DIR / "priv.pem", _DEMO_DIR / "pub.pem"
-    if not private.exists():
-        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        private.write_bytes(key.private_bytes(
-            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-            serialization.NoEncryption()))
-        public.write_bytes(key.public_key().public_bytes(
-            serialization.Encoding.PEM,
-            serialization.PublicFormat.SubjectPublicKeyInfo))
-    return private, public
+    """The demo pair, from durable storage rather than this container's disk.
+
+    Generating it here and leaving it in _DEMO_DIR is what this did, and on a
+    container that quietly breaks every advice already in the world: the
+    filesystem is rebuilt on deploy, a fresh pair appears, and a genuine advice
+    issued last week verifies as NOT_ISSUED. See services/demo_keys.
+    """
+    from ..services.demo_keys import demo_key_pair
+
+    return demo_key_pair(_RZP_AUTHORITY_ID, _DEMO_DIR)
 
 
 #: Modes RazorpayX settles by. NEFT and RTGS are the ones that matter here:
@@ -222,10 +220,38 @@ async def advice_image(payout_id: str):
     """
     safe = "".join(ch for ch in payout_id if ch.isalnum() or ch == "_")
     path = _DEMO_DIR / "issued" / f"{safe}.png"
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="No such advice.")
-    return FileResponse(path, media_type="image/png",
-                        filename=f"{safe}.png")
+    if path.is_file():
+        return FileResponse(path, media_type="image/png", filename=f"{safe}.png")
+    return _from_object_store(f"rzp_{safe}", f"{safe}.png", _RZP_AUTHORITY_ID, "advice")
+
+
+def _from_object_store(document_id: str, filename: str, authority_id: str, label: str):
+    """The same page, from where it was filed, once the container has moved on.
+
+    The issued directory is the container's own disk, so a link to it survives
+    exactly as long as the container does — reload the page after a deploy and
+    a document that plainly exists answers 404. Every issued document is also
+    put in the object store at signing time, which is durable, so that is where
+    to look second.
+    """
+    from fastapi.responses import StreamingResponse
+
+    key = f"signed_documents/{authority_id}/{document_id}/{filename}"
+    try:
+        chunks = get_document_store().stream(key)
+        # stream() is a generator, so a missing object does not fail until the
+        # first read. Taking that read here turns it into a clean 404 rather
+        # than a 200 that breaks halfway through the image.
+        first = next(chunks, b"")
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"No such {label}.") from exc
+
+    def body():
+        yield first
+        yield from chunks
+
+    return StreamingResponse(body(), media_type="image/png",
+                             headers={"Content-Disposition": f'inline; filename="{filename}"'})
 
 
 def _check_from_signature(upload: Path, public_pem: Path, label: str) -> dict:
