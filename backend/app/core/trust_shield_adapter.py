@@ -68,3 +68,33 @@ def visual_fingerprint_hex(path: str | Path) -> str:
     if suffix in {".png", ".jpg", ".jpeg"}:
         return generate_image_fingerprint(read_image(path)).hex()
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def page_fingerprints_hex(path: str | Path) -> list[str]:
+    """A perceptual fingerprint for every page of a document.
+
+    One entry for an image, one per page for a PDF. This exists because
+    `visual_fingerprint_hex` answers with a SHA-256 of the file for anything
+    that is not an image, and a file hash cannot recognise a document that has
+    been through anything at all — which makes it useless for the one job that
+    matters here, finding the filed copy of a page whose signature an editor
+    has destroyed. A page exported from a signed PDF and then edited was
+    unfindable for exactly that reason.
+
+    Never raises: a document whose pages cannot be rendered simply has no page
+    fingerprints, and lookup falls back to what it had before.
+    """
+    file_path = Path(path)
+    suffix = file_path.suffix.lower()
+    try:
+        if suffix in {".png", ".jpg", ".jpeg"}:
+            return [generate_image_fingerprint(read_image(file_path)).hex()]
+        if suffix == ".pdf":
+            # The project root is already on sys.path, put there above.
+            from pdf_support import render_pdf_pages
+
+            return [generate_image_fingerprint(page).hex()
+                    for page in render_pdf_pages(file_path)]
+    except Exception as exc:  # pragma: no cover - bookkeeping must not block
+        print(f"WARNING: page fingerprints unavailable for {file_path.name}: {exc}", flush=True)
+    return []

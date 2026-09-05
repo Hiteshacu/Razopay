@@ -120,6 +120,57 @@ class VerificationService:
             return None
 
     @staticmethod
+    def _reference_pages(filed: bytes, matched_page: int | None, page) -> list:
+        """The page of the filed copy that this upload is a copy of.
+
+        A signed PDF is the case this exists for. Its bytes are not an image,
+        so decoding them as one returns nothing and the comparison silently
+        never ran — which is how a page exported from a signed circular came
+        back as a document that was never signed.
+
+        Which page matters as much as which document. A reader uploads one
+        page and nothing in the image says which; compared against the wrong
+        one, every line differs and the answer is a page covered in boxes. The
+        page is chosen by perceptual fingerprint rather than by comparing
+        against each in turn, because a fingerprint is a few milliseconds and a
+        comparison is most of a second.
+        """
+        import tempfile
+
+        import cv2
+        import numpy as np
+
+        if not filed.startswith(b"%PDF"):
+            decoded = cv2.imdecode(np.frombuffer(filed, dtype=np.uint8), cv2.IMREAD_COLOR)
+            return [decoded] if decoded is not None else []
+
+        from pdf_support import render_pdf_pages
+        from utils import generate_image_fingerprint
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as handle:
+            handle.write(filed)
+            pdf_path = Path(handle.name)
+        try:
+            pages = render_pdf_pages(pdf_path)
+        finally:
+            pdf_path.unlink(missing_ok=True)
+        if not pages:
+            return []
+        if matched_page is not None and 0 <= matched_page < len(pages):
+            return [pages[matched_page]]
+        if len(pages) == 1:
+            return pages
+
+        wanted = generate_image_fingerprint(page)
+        best, best_distance = pages[0], None
+        for candidate in pages:
+            other = generate_image_fingerprint(candidate)
+            distance = sum(bin(a ^ b).count("1") for a, b in zip(wanted, other))
+            if best_distance is None or distance < best_distance:
+                best, best_distance = candidate, distance
+        return [best]
+
+    @staticmethod
     def _page_fingerprint(upload_path: Path) -> str:
         """The 128-bit perceptual fingerprint of a page, as hex.
 
@@ -192,12 +243,25 @@ class VerificationService:
             from razorpayx.compare import compare
             from utils import read_image
 
-            reference = cv2.imdecode(np.frombuffer(filed, dtype=np.uint8), cv2.IMREAD_COLOR)
-            if reference is None:
+            page = read_image(upload_path)
+            references = self._reference_pages(filed, record.get("matched_page"), page)
+            if not references:
                 return None
 
-            finding = compare(read_image(upload_path), reference)
-            if not finding.comparable:
+            # One page, or the best of several. A reader who exports page two
+            # of a signed circular and edits it uploads one page, and nothing
+            # in that image says which page it was — so when the fingerprint
+            # match did not already name one, every page is tried and the one
+            # that disagrees least is the one being looked at. A wrong page
+            # disagrees almost everywhere, so this is not a close call.
+            finding = None
+            for candidate in references:
+                attempt = compare(page, candidate)
+                if not attempt.comparable:
+                    continue
+                if finding is None or attempt.coverage < finding.coverage:
+                    finding = attempt
+            if finding is None:
                 return None
             return {
                 "compared": True,

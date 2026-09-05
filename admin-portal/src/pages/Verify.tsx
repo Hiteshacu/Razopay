@@ -538,7 +538,15 @@ export function Verify({ onBack }: { onBack: () => void }) {
                   something more specific to say — how many places on the
                   page changed, which the boxes below are about to show. */}
               <p className="verdict-plain">
-                {marks.boxes.length > 0 && result.reason ? result.reason : verdict.plain}
+                {/* The service's own words whenever it found something more
+                    specific to say than the stock line for the verdict — which
+                    includes the case with nothing to draw, where it has
+                    recognised the document and checked every word of it. That
+                    condition used to require a box, so the most informative
+                    answer the service can give was the one nobody saw. */}
+                {result.reason && (marks.boxes.length > 0 || result.details?.content?.compared)
+                  ? result.reason
+                  : verdict.plain}
               </p>
 
               {/* Every changed part, drawn on the page the reader uploaded.

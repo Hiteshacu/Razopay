@@ -102,25 +102,34 @@ class FirebaseService:
             return None
 
         best = None
+        best_page = None
         best_distance = self.FINGERPRINT_MATCH_BITS + 1
         for document in (self.db.collection("signed_documents")
                          .limit(self.FINGERPRINT_SCAN_LIMIT).stream()):
             record = document.to_dict() or {}
-            stored = record.get("visual_fingerprint_hash")
-            if not isinstance(stored, str):
-                continue
-            try:
-                other = bytes.fromhex(stored)
-            except ValueError:
-                continue
-            if len(other) != len(wanted):
-                continue
-            distance = sum(bin(a ^ b).count("1") for a, b in zip(wanted, other))
-            if distance < best_distance:
-                best, best_distance = record, distance
+            # Every page of the document, then the single whole-document
+            # value for records filed before pages were kept. That older field
+            # is a perceptual fingerprint only for images; for a PDF it is a
+            # SHA-256 of the file, which is a different length and is skipped
+            # rather than compared as if it meant something.
+            candidates = [v for v in (record.get("page_fingerprints") or [])
+                          if isinstance(v, str)]
+            if isinstance(record.get("visual_fingerprint_hash"), str):
+                candidates.append(record["visual_fingerprint_hash"])
+            for index, stored in enumerate(candidates):
+                try:
+                    other = bytes.fromhex(stored)
+                except ValueError:
+                    continue
+                if len(other) != len(wanted):
+                    continue
+                distance = sum(bin(a ^ b).count("1") for a, b in zip(wanted, other))
+                if distance < best_distance:
+                    best, best_distance = record, distance
+                    best_page = index if index < len(record.get("page_fingerprints") or []) else None
         if best is None:
             return None
-        return {**best, "fingerprint_distance": best_distance}
+        return {**best, "fingerprint_distance": best_distance, "matched_page": best_page}
 
     def list_signed_documents(self, authority_id: str | None = None) -> list[dict[str, Any]]:
         query = self.db.collection("signed_documents")

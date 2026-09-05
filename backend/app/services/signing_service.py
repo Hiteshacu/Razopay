@@ -8,7 +8,11 @@ from uuid import uuid4
 from fastapi import UploadFile
 
 from ..config import ensure_local_storage_dirs, settings
-from ..core.trust_shield_adapter import sign_file_adapter, visual_fingerprint_hex
+from ..core.trust_shield_adapter import (
+    page_fingerprints_hex,
+    sign_file_adapter,
+    visual_fingerprint_hex,
+)
 from .audit_service import AuditService, utc_now
 from .document_store import get_document_store
 from .firebase_service import FirebaseService
@@ -115,6 +119,12 @@ class SigningService:
                 "signed_filename": signed_filename,
                 "file_type": suffix.removeprefix(".").upper(),
                 "visual_fingerprint_hash": visual_fingerprint_hex(upload_path),
+                # One perceptual fingerprint per page, which is what lets a
+                # later verification recognise a page of this document after an
+                # editor has destroyed the signature in it. The field above
+                # cannot: for anything that is not an image it is a hash of the
+                # file's bytes, which changes completely if a single pixel does.
+                "page_fingerprints": page_fingerprints_hex(upload_path),
                 "storage_type": storage_type,
                 "download_url": signed_url,
                 "signed_file_storage_path": storage_path,

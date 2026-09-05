@@ -191,6 +191,13 @@ quality 20, a photograph of a screen, a watermark, or a full re-typeset, while u
 documents land at 65–67. That identifies the page; it never authenticates it, and where
 the signature is gone the verdict says so.
 
+A signed PDF is filed as a PDF, and a reader edits one page of it exported as an image.
+So a perceptual fingerprint is recorded **per page** at signing — the older whole-document
+field is a SHA-256 of the file for anything that is not an image, which recognises nothing
+that has been through anything — and the comparison renders the filed PDF and picks the
+page whose fingerprint is nearest the upload before comparing. Compared against the wrong
+page, every line differs and the answer is a page covered in boxes.
+
 | Case | Result |
 |---|---|
 | Untouched, and 19 honest journeys (JPEG down to q20, WhatsApp, screenshot, photo of a screen, greyscale, ±8% brightness) | no boxes |
