@@ -278,15 +278,19 @@ def _check_from_signature(upload: Path, public_pem: Path, label: str) -> dict:
         "regions": regions,
     }
 
-    # The carrier is torn in one place: an edit the page fingerprint's
+    # The carrier is flattened somewhere: an edit the page fingerprint's
     # tolerance is wide enough to absorb, which is the case it is blind to.
     if finding.edited:
+        # Say how many places, because the boxes drawn on the page say it too
+        # and copy that always reads "one region" contradicts three of them.
+        count = len(regions)
+        where = ("in one region" if count <= 1 else f"in {count} separate regions")
         return {**base, "status": "ALTERED",
-                "headline": f"Issued by RazorpayX, then edited",
+                "headline": "Issued by RazorpayX, then edited",
                 "detail": (f"The signature is real — RazorpayX did issue this {label}. "
-                           "But the proof woven through the page is torn in one "
-                           "region, which means that part was changed afterwards. "
-                           "Do not release goods against this document.")}
+                           f"But the proof woven through the page is broken {where}, "
+                           "which means those parts were changed afterwards. "
+                           "Do not lend, rent or hire against this payslip.")}
 
     if signed_ok:
         return {**base, "status": "GENUINE", "headline": "Genuine",

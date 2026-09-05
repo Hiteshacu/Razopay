@@ -74,7 +74,7 @@ class VerificationService:
         messaging app also absorbs a repainted figure: a measured 4.1% edit
         passed as authentic on one page and was caught on another, because
         size is not what decides. The carrier is per-block, so an edit shows
-        as a contiguous patch of disagreement where recompression shows as
+        as a contiguous patch of flattened blocks where recompression shows as
         thin scatter.
 
         Never allowed to fail a verification.
@@ -133,16 +133,18 @@ class VerificationService:
                     }
 
                 # The signature is genuine and the fingerprint still matches,
-                # but the carrier is torn in one place. That is an edit small
+                # but the carrier is flattened somewhere. That is an edit small
                 # enough for the fingerprint's tolerance to absorb, which is
                 # exactly the case it was blind to, so the carrier overrules.
                 if carrier and carrier.get("edited"):
+                    count = len(carrier.get("regions") or ())
+                    where = "in one region" if count <= 1 else f"in {count} separate regions"
                     return {
                         "success": False,
                         "result": "TAMPERED",
                         "reason": (
                             "The signature is genuine, but the proof woven through "
-                            "the page is torn in one region — that part was edited "
+                            f"the page is broken {where} — those parts were edited "
                             "after signing."
                         ),
                         "authority_name": key.get("authority_name"),

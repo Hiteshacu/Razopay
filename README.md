@@ -57,59 +57,71 @@ and Razorpay does not have to be online for a vendor to get an answer.
 
 ## How tamper detection works
 
-The interesting part, because the obvious approach does not work.
+The interesting part, because the two obvious approaches do not work.
 
-The signature carries a fingerprint of the whole page. That **cannot** catch small edits —
-the tolerance that lets it survive WhatsApp is the same tolerance that absorbs a repainted
-figure. Measured: the identical 4.1% edit passed on one advice and was caught on another.
-It let **11 of 16 edits through**.
+**The whole-page fingerprint cannot catch small edits.** The tolerance that lets it
+survive WhatsApp is the same tolerance that absorbs a repainted figure. Measured: the
+identical 4.1% edit passed on one advice and was caught on another. It let **11 of 16
+edits through**.
 
-A finer fingerprint does not help either. A grid of regional hashes, tried at four grid
-sizes, caught **0 of 30** — each cell is still a downsample, so a changed digit gets
+**A finer fingerprint does not help either.** A grid of regional hashes, tried at four
+grid sizes, caught **0 of 30** — each cell is still a downsample, so a changed digit gets
 averaged away.
 
 The signal is the carrier itself. The embedded signature lives in thousands of 8×8 blocks,
 each holding one bit of a payload that survives locally destroyed blocks because it is
 repeated across the page and majority-voted. So the payload is recovered **from the edited
-page**, and every block is asked whether it still agrees.
+page**, and every block is asked whether it still carries it.
 
 Measuring *how much* damage fails: a photo of a screen concentrates damage 22× above its
-own mean, the weakest forgery only 13×.
+own mean, the weakest forgery only 13×. And measuring *which bits read back wrong* only
+half works — it catches an edit that covers a whole field and misses a single digit,
+because painting over a value leaves a flat block whose two mid-frequency coefficients are
+both near zero, so which one is larger becomes a coin toss. Half the blocks inside an
+erased digit still read back correctly, and the patch dissolves into speckle.
 
-The difference is not amount, it is **shape**. Recompression scatters errors thinly and
-independently. An edit tears one contiguous patch. Measuring the largest connected patch
-separates cleanly.
+What separates them is the **margin**: how far each block's coefficient pair still leans
+the way the payload says it should. Signing pushes every pair apart by at least 36 DCT
+units. Nothing enforces that on pixels a forger paints, so the margin collapses across
+every block they touched — erased or retyped, it makes no difference — while honest
+recompression only thins it. Judged against the page's *own* median margin, so a dimmed,
+brightened or heavily recompressed copy is compared with itself rather than with an
+absolute number.
 
 ## Measured results
 
 Held-out evaluation split (seed 5000); thresholds were fixed on a development split
 (seed 1000) and never refitted.
 
-**Carrier tamper detection**
+**Carrier tamper detection**, over 72 honest copies and 104 edits the carrier could be
+read from:
 
-| | |
-|---|---|
-| False accusations | **0** across 126 honest copies |
-| Missed edits | **0** across 70 edits |
-| Honest blob sizes | 0, 4, 6 — never above 6 |
-| Edited blob sizes | 7 to 27, median 13 |
-| Threshold | 7 |
+| | Sign disagreement | Margin collapse |
+|---|---|---|
+| False accusations | 0 | **0** |
+| Missed edits | 52 of 104 | **8 of 104** |
+| Honest patch sizes | 0–6 | 0–8 |
+| Edited patch sizes | 0–27 | 10–629 |
+| Threshold | 7 | **9** |
 
-Before this, the fingerprint alone caught 5 of 16. Now 16 of 16.
+The 52 misses were all small edits — one digit erased or swapped — which is the case a
+forger actually needs. The 8 that remain are one narrow case: a single digit in the small
+secondary amount row, replaced by a same-width glyph. Every edit to the headline amount is
+caught at every size tested.
 
 **Region localisation** — 1 edit gives 1 box, 2 give 2, 3 give 3, each on the field that
 was actually repainted.
 
-**Payout advice benchmark** (`python -m razorpayx.cli benchmark --seed 5000`)
+**Payout advice benchmark** (`python -m razorpayx.cli benchmark --advices 8 --seed 5000`)
 
 ```
-Forgeries rejected      76 / 76      recall     1.000
-Falsely accused          0 / 40      precision  1.000
-Genuine passed          36 / 40      FPR        0.000
+Forgeries rejected     152 / 152     recall     1.000
+Falsely accused          0 / 80      precision  1.000
+Genuine passed          72 / 80      FPR        0.000
 ```
 
-**Payslips** — 3/3 genuine verify on all six adjudicated fields; 9/9 forgeries rejected,
-including a single changed digit.
+**Payslips** — the same detector, unchanged: genuine slips pass, and erasing one digit of
+net pay is caught and boxed.
 
 ## What it cannot do
 
@@ -175,9 +187,10 @@ fingerprint it (128-bit perceptual)      check the RSA signature
         ↓                                        ↓
 sign with RSA-PSS                        compare the fingerprint
         ↓                                        ↓
-weave signature + fingerprint            ask every 8×8 block if it agrees
-across every 8×8 DCT block                       ↓
-        ↓                                 largest torn patch → edited, and where
+weave signature + fingerprint            ask every 8×8 block how hard it
+across every 8×8 DCT block               still leans the way it was written
+        ↓                                        ↓
+                                          largest flattened patch → edited, and where
 store in S3, record in Firestore
 ```
 

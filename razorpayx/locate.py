@@ -3,25 +3,44 @@
 The signal is the carrier itself. Every 8x8 block holds one bit of a payload
 that survives locally destroyed blocks, because it is repeated across the page
 and majority-voted. So the payload can be recovered from a damaged page, and
-every block then asked whether it still agrees with what was recovered.
-Recompression disagrees thinly and independently, everywhere. An edit destroys
-a contiguous patch.
+every block then asked whether it still carries what was recovered.
+Recompression weakens blocks thinly and independently, everywhere. An edit
+flattens a contiguous patch of them.
 
-Which statistic is asked matters more than it looks, and the first one tried
-was the wrong one. Peak local density over the page's own mean — an amplitude
-— does not separate: a photograph of a screen concentrates damage 22x and the
-weakest forgery 13x, so a detector built on it would call honest photographs
-forged. That measurement stands, and is why `locate` is a pointer that never
-decides anything.
+Two statistics were wrong before this one, and both are worth keeping in view.
 
-The difference between an edit and recompression is not amplitude but shape,
-and the largest connected patch measures shape. Over 48 honest journeys and 32
-edits, honest pages produced a blob of 0 or exactly 4 and never more, while
-edits produced 6 to 27. Four is structural rather than lucky: after a 2x2
-opening the smallest surviving component is one 2x2 block, so an honest page
-holds at most one isolated cluster and an edit leaves a real patch. That is
-what `inspect_carrier` decides on, and it is the only thing in this module
-allowed to decide anything.
+Peak local density over the page's own mean — an amplitude — does not separate
+anything: a photograph of a screen concentrates damage 22x and the weakest
+forgery 13x, so a detector built on it would call honest photographs forged.
+That is why `locate` is a pointer that never decides anything.
+
+Sign disagreement — counting the blocks whose bit now reads back wrong — is
+better, and it is what this module decided on for a while. It catches an edit
+that covers a whole field, and it misses small ones almost completely: 33 of 65
+measurable edits went through, including erasing a single digit from the
+headline amount. The reason is in what an edit does to a block. Painting over
+a value leaves a flat block whose two mid-frequency coefficients are both near
+zero, so which one is larger is a coin toss: about half of the blocks inside
+an erased digit still read back correctly, the patch arrives as speckle rather
+than a solid piece, and a 2x2 opening dissolves it.
+
+What decides now is the *margin*: how far each block's coefficient pair still
+leans the way the payload says it should. The embedder pushes every pair apart
+by at least 36 DCT units, and nothing enforces that on pixels a forger paints,
+so the margin collapses across every block they touched whether they erased
+the digit or typed a new one over it. Measured against the page's own median
+margin — relative, so a dimmed or brightened or heavily recompressed copy is
+judged against itself — the same edits become solid patches of 10 to 580
+blocks while honest journeys reach 8 at worst. On a held-out set that is 0
+false accusations in 72 honest copies and 8 misses in 104 edits, against 52
+misses for sign disagreement on the same files. `inspect_carrier` decides on
+it, and it is the only thing in this module allowed to decide anything.
+
+The 8 that still get through are one case: a single digit in the small
+secondary amount row, replaced by a same-width glyph. Drawing text back in
+restores contrast, which puts those blocks back on the coin toss, and three
+blocks by three is too little to survive the opening at half strength. An edit
+to the headline the reader actually looks at is caught at every size tested.
 
 What it cannot do is read a page whose payload will not come back — a heavy
 downscale, or a messaging-app re-encode, where recovery needs the registry
@@ -62,11 +81,11 @@ class Region:
     #: scoring against the clamped centre marked correct localisations wrong.
     peak_x: int
     peak_y: int
-    #: Peak local disagreement over the page's own mean. Comparative, not
+    #: Peak local weakness over the page's own mean. Comparative, not
     #: absolute: it says this patch is unlike the rest of *this* page, which
     #: is the only comparison that survives an image already damaged all over.
     concentration: float
-    #: Fraction of carrier blocks that disagree across the whole page.
+    #: Fraction of carrier blocks weakened across the whole page.
     background_rate: float
     #: How many carrier blocks this patch covers. What decides whether it is
     #: an edit at all, and what the regions are ordered by.
@@ -77,8 +96,112 @@ class Region:
         return (self.left, self.top, self.right, self.bottom)
 
 
+def carrier_margin(image: np.ndarray, payload_bits: np.ndarray) -> np.ndarray:
+    """Per carrier block: how hard it still leans the way the payload says.
+
+    The embedder does not merely set the sign of each coefficient pair, it
+    pushes the pair apart by at least `strength` — 36 DCT units, plus a little
+    more on a detailed block. So every block of a signed page carries a margin
+    of roughly that size in a known direction, and nothing whatsoever enforces
+    that on pixels a forger paints.
+
+    Reading the sign alone, which is what the extractor does and what this
+    module used to do, throws that away. It matters because of how an edit
+    fails. Painting over a value replaces a modulated block with a flat one,
+    and a flat block's two mid-frequency coefficients are both near zero — so
+    its sign is a coin toss. Half the blocks inside an erased digit still
+    "agree" by luck, the patch arrives as speckle rather than a solid piece,
+    and a 2x2 opening dissolves it. Measured: erasing one digit of the headline
+    amount left a largest patch of 0 to 8 blocks, inside the range honest JPEGs
+    produce, so it was called clean.
+
+    The margin does not toss a coin. It collapses to about zero across every
+    block the forger touched, whether they erased the digit or typed a new one
+    over it, which turns the same edit into a solid patch.
+
+    NaN marks a block no bit was written to: the payload is repeated a whole
+    number of times and the remainder blocks carry nothing to be judged by.
+    """
+    cropped = u.crop_to_block_grid(image)
+    luminance = cv2.cvtColor(cropped, cv2.COLOR_BGR2YCrCb)[:, :, 0].astype(np.float32)
+
+    blocks = u.image_to_blocks(luminance) - 128.0
+    coefficients = (u.DCT_MATRIX @ blocks @ u.DCT_MATRIX.T).reshape(-1, u.BLOCK_SIZE, u.BLOCK_SIZE)
+
+    rows = luminance.shape[0] // u.BLOCK_SIZE
+    cols = luminance.shape[1] // u.BLOCK_SIZE
+    total = rows * cols
+
+    permutation = u.watermark_permutation(total)
+    repetition = u.watermark_repetition(total, payload_bits.size)
+    carriers = permutation[: repetition * payload_bits.size].reshape(repetition, payload_bits.size)
+
+    # True where the payload wants the first coefficient of the pair to be the
+    # larger one, which is exactly the convention the embedder writes under.
+    wants_a_larger = payload_bits[None, :].repeat(repetition, axis=0).astype(bool)
+
+    gaps = np.zeros(carriers.shape, dtype=np.float32)
+    for (a_row, a_col), (b_row, b_col) in u.WATERMARK_EMBED_COEFFICIENT_PAIRS:
+        a = coefficients[:, a_row, a_col][carriers]
+        b = coefficients[:, b_row, b_col][carriers]
+        gaps += np.where(wants_a_larger, a - b, b - a)
+    gaps /= len(u.WATERMARK_EMBED_COEFFICIENT_PAIRS)
+
+    grid = np.full(total, np.nan, dtype=np.float32)
+    grid[carriers.ravel()] = gaps.ravel()
+    return grid.reshape(rows, cols)
+
+
+#: A block is called weak when its margin falls below this fraction of the
+#: page's own median margin.
+#:
+#: Relative rather than absolute, and that is the whole of what makes it usable
+#: on a copy that has been through something. A hard cut-off in DCT units gets
+#: the small edits right and then accuses honest pages that have been dimmed,
+#: brightened or heavily recompressed, because those shrink the margin
+#: everywhere at once: a 3% brightness lift clips the near-white paper the
+#: carrier is written on and drops the page median from 22 to 2, at which point
+#: every block on a perfectly honest page sits under any fixed threshold.
+#:
+#: Measured against the page's own median, that same brightened page produces a
+#: largest weak patch of 0 to 6 — because what changed was the whole page, not
+#: one part of it. An edit is defined by being unlike the rest of its own page,
+#: and this is the only comparison that says so.
+WEAK_MARGIN_FRACTION = 0.35
+
+#: Below this page median margin, in DCT units, no claim is made at all.
+#:
+#: The fraction above is a ratio, and a ratio of something that has essentially
+#: vanished is noise. A page whose carrier has been flattened this far is one
+#: the detector cannot see into, and saying so is the honest answer.
+MIN_PAGE_MARGIN = 1.5
+
+
+def carrier_weakness(image: np.ndarray, payload_bits: np.ndarray) -> tuple[np.ndarray, float]:
+    """Blocks whose carrier has been flattened, and the page's own margin.
+
+    Returns a 0/1 grid over blocks and the median margin it was judged
+    against. A margin below MIN_PAGE_MARGIN means the page cannot be judged;
+    callers check for it rather than reading the grid.
+    """
+    margin = carrier_margin(image, payload_bits)
+    written = ~np.isnan(margin)
+    if not written.any():
+        return np.zeros(margin.shape, dtype=np.uint8), 0.0
+
+    page_margin = float(np.nanmedian(margin))
+    weak = written & (margin < page_margin * WEAK_MARGIN_FRACTION)
+    return weak.astype(np.uint8), page_margin
+
+
 def disagreement_map(image: np.ndarray, payload_bits: np.ndarray) -> np.ndarray:
-    """Per carrier block: 1 where it contradicts the recovered payload."""
+    """Per carrier block: 1 where its sign contradicts the recovered payload.
+
+    Kept because it is the plainest statement of what the carrier is for, and
+    still what `read` and the field check reason about. It is no longer what
+    decides whether a page was edited — see `carrier_margin` for why the sign
+    alone loses half of a small edit.
+    """
     cropped = u.crop_to_block_grid(image)
     luminance = cv2.cvtColor(cropped, cv2.COLOR_BGR2YCrCb)[:, :, 0].astype(np.float32)
 
@@ -103,7 +226,10 @@ def disagreement_map(image: np.ndarray, payload_bits: np.ndarray) -> np.ndarray:
 #:
 #: Four is what an honest page produces at most — the smallest component a 2x2
 #: opening can leave — so anything at or below it is the scatter that
-#: recompression makes everywhere, not an edit.
+#: recompression makes everywhere, not an edit. Kept below
+#: EDIT_BLOB_THRESHOLD on purpose: what decides is the largest patch, and once
+#: a page has been called edited the reader is better served by seeing every
+#: piece of it than by having the smaller ones hidden.
 MIN_REGION_BLOCKS = 5
 
 #: How far apart two torn fragments may be and still count as one edit, in
@@ -130,7 +256,7 @@ def locate_all(
     min_blocks: int = MIN_REGION_BLOCKS,
     pad: int = 2,
 ) -> list[Region]:
-    """Every torn patch of carrier, largest first.
+    """Every flattened patch of carrier, largest first.
 
     One box was not enough, and it was the wrong shape as well as the wrong
     count. Reporting the densest fixed window meant a 7x7 square drawn wherever
@@ -142,13 +268,13 @@ def locate_all(
     component's own extent rather than a fixed window, padded slightly so the
     highlight reads as covering the change rather than sitting inside it.
     """
-    grid = disagreement_map(image, payload_bits)
-    if grid.size == 0:
+    weak, page_margin = carrier_weakness(image, payload_bits)
+    if weak.size == 0 or page_margin < MIN_PAGE_MARGIN:
         return []
 
+    grid = weak.astype(np.float32)
     background = float(grid.mean())
-    binary = (grid > 0.5).astype(np.uint8)
-    opened = cv2.morphologyEx(binary, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    opened = cv2.morphologyEx(weak, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
 
     # Bridge the gaps inside one edit before counting patches.
     #
@@ -245,7 +371,7 @@ def _merge_overlapping(regions: list[Region]) -> list[Region]:
 
 
 def locate(image: np.ndarray, payload_bits: np.ndarray, *, window: int = WINDOW) -> Region | None:
-    """The largest torn patch, or None if there is none worth reporting."""
+    """The largest flattened patch, or None if there is none worth reporting."""
     found = locate_all(image, payload_bits)
     return found[0] if found else None
 
@@ -289,37 +415,41 @@ def payload_bits_for(image: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
     return None
 
 
-#: Largest connected patch of disagreeing carrier blocks, after a 2x2 opening,
-#: at or above which a page is called edited.
+#: Largest connected patch of weakened carrier blocks, after a 2x2 opening, at
+#: or above which a page is called edited.
 #:
-#: Measured over 126 honest journeys and 70 edits. Honest pages produced 0 (69
-#: times), 4 (49) and 6 (8), and never more. Edits started at 7, with a median
-#: of 13. Seven is therefore the only value that costs nothing in either
-#: direction: no honest page reaches it, and no edit falls below it.
+#: Nine, measured on the weak map. The number moved with the signal underneath
+#: it: it was 7 when the map was sign disagreement, and that pairing let 33 of
+#: 65 measurable edits through — every one of them a small edit, because a
+#: repainted digit only flips half the signs it touches. On the margin map the
+#: same edits produce solid patches of 10 to 580 blocks, and honest journeys
+#: reach 8 at the very worst (a sharpened copy; JPEG down to quality 35, a
+#: brightened page and a dimmed one all sit at 4 or below).
 #:
-#: It was 6, set against 48 honest samples whose worst case happened to be 4. A
-#: wider run put eight honest JPEGs at 6 exactly, which the old threshold read
-#: as forged — sampling variance rather than a bug, and the reason a number
-#: this consequential is worth measuring against the tail rather than the bulk.
+#: The fraction the weak map is cut at barely matters — anything from 0.20 to
+#: 0.50 of the page median gives the same answer on every sample — so the one
+#: number that does matter is this one.
 #:
 #: If it has to move again it should move up. The two errors are not equal:
 #: missing a smaller edit costs one consignment of goods, while calling an
 #: honest payer's advice forged costs them the customer they were paying.
-EDIT_BLOB_THRESHOLD = 7
+EDIT_BLOB_THRESHOLD = 9
 
 
 @dataclass(frozen=True)
 class CarrierFinding:
     """What the carrier's own error pattern says about a page."""
 
-    #: Whether the payload could be recovered at all. False means no claim is
-    #: being made — not that the page is clean.
+    #: Whether the page could be judged at all. False means no claim is being
+    #: made — not that the page is clean. Either the payload did not come back,
+    #: or the carrier is too flattened everywhere to say anything about one
+    #: part of the page.
     measurable: bool
-    #: Largest connected patch of disagreeing blocks, after opening.
+    #: Largest connected patch of weakened blocks, after opening.
     blob: int
-    #: Fraction of carrier blocks disagreeing across the whole page.
+    #: Fraction of carrier blocks weakened across the whole page.
     background_rate: float
-    #: Every torn patch, largest first. Empty when nothing crosses the floor.
+    #: Every flattened patch, largest first. Empty when nothing crosses the floor.
     regions: tuple[Region, ...] = ()
     #: Width and height of the image the carrier was actually read from, which
     #: is not the uploaded size when recovery succeeded at another scale. Boxes
@@ -365,15 +495,17 @@ def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFindin
         return CarrierFinding(measurable=False, blob=0, background_rate=0.0)
     bits, read_image = recovered
 
-    grid = disagreement_map(read_image, bits)
-    if grid.size == 0:
+    weak, page_margin = carrier_weakness(read_image, bits)
+    if weak.size == 0 or page_margin < MIN_PAGE_MARGIN:
+        # The carrier is there — the payload came back — but flattened far
+        # enough that a patch of flattened blocks says nothing about which part
+        # of the page a forger touched. Declining is the honest answer.
         return CarrierFinding(measurable=False, blob=0, background_rate=0.0)
 
-    background = float(grid.mean())
-    binary = (grid > 0.5).astype(np.uint8)
+    background = float(weak.mean())
     # Opening drops lone blocks and keeps solid patches, which is the whole
     # distinction being measured.
-    opened = cv2.morphologyEx(binary, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    opened = cv2.morphologyEx(weak, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
     count, _, stats, _ = cv2.connectedComponentsWithStats(opened, connectivity=8)
     blob = int(stats[1:, cv2.CC_STAT_AREA].max()) if count > 1 else 0
 
