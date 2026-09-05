@@ -302,6 +302,11 @@ def _check_from_signature(upload: Path, public_pem: Path, label: str) -> dict:
         "measurable": finding.measurable,
         "blob": finding.blob,
         "regions": regions,
+        # Whether this was done to part of the page or to all of it. The
+        # reader needs the difference: one is a changed value they can be
+        # pointed at, the other is a page that has been through something.
+        "page_wide": finding.page_wide,
+        "coverage": round(finding.coverage, 4),
     }
 
     # The carrier is flattened somewhere: an edit the page fingerprint's
@@ -311,6 +316,16 @@ def _check_from_signature(upload: Path, public_pem: Path, label: str) -> dict:
         # and copy that always reads "one region" contradicts three of them.
         count = len(regions)
         where = ("in one region" if count <= 1 else f"in {count} separate regions")
+        if finding.page_wide:
+            return {**base, "status": "ALTERED",
+                    "headline": "Issued by RazorpayX, then re-saved by an editor",
+                    "detail": (f"The signature is real — RazorpayX did issue this {label} — "
+                               f"but the proof is broken across {round(finding.coverage * 100)}% "
+                               "of the page, not in one place. That is what an online image "
+                               "editor does: it redraws the text it finds, so every line it "
+                               "touched is new pixels. Whatever else was changed cannot be "
+                               "separated from that. Do not release goods against this "
+                               "document, and ask for the original file.")}
         return {**base, "status": "ALTERED",
                 "headline": "Issued by RazorpayX, then edited",
                 "detail": (f"The signature is real — RazorpayX did issue this {label}. "

@@ -522,8 +522,13 @@ export function Verify({ onBack }: { onBack: () => void }) {
                     })}
                   </div>
                   <figcaption>
-                    The proof woven through the page is torn here — read out of the
-                    pixels themselves, not from any record of what this page said.
+                    {result.details?.carrier?.page_wide
+                      ? "Every place the page differs from what was signed. Spread this " +
+                        "widely, it is the mark of an online image editor redrawing the " +
+                        "text it found — so the editor's own work and anything else that " +
+                        "changed cannot be told apart. Ask for the original file."
+                      : "The proof woven through the page is torn here — read out of the " +
+                        "pixels themselves, not from any record of what this page said."}
                   </figcaption>
                 </figure>
               )}

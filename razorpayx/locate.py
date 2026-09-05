@@ -51,6 +51,22 @@ innocence, and a small edit falls apart inside it. The window is therefore
 sized to the page's carrier density, which leaves dense pages exactly as they
 were and halves the misses on large ones.
 
+There is a floor under all of this, and on a large page a small edit sits on
+it. RSA-PSS salts every signature, so signing one page twice writes two
+different payloads into it and a different set of blocks ends up carrying each
+bit. Signing the same letter eight times and making the same one-date edit each
+time gives largest patches of 6, 8, 8, 10, 10, 14, 16 and 17, against 0 to 6 for
+the untouched and sharpened copies of those same eight. The edit is real every
+time; whether it clears the threshold depends on which blocks happened to carry
+a bit near it. Anything smaller than a printed value is therefore a coin weighted
+by the signing, not a measurement, and the numbers quoted here have that spread
+in them.
+
+The fix for that is not a threshold. It is carrying more bits on a large page:
+the payload is repeated at most MAX_REPETITION times whatever the page size, so
+a 2000x2600 scan leaves 69% of its blocks empty. Raising that cap changes how
+every already-signed document reads back, so it needs a reader that tries both.
+
 What it cannot do is read a page whose payload will not come back — a heavy
 downscale, or a messaging-app re-encode, where recovery needs the registry
 rather than a direct read. Those return measurable=False and make no claim,
@@ -532,6 +548,27 @@ def payload_bits_for(image: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
 #: honest payer's advice forged costs them the customer they were paying.
 EDIT_BLOB_THRESHOLD = 9
 
+#: Share of the page inside reported regions, and how many regions, above which
+#: the damage stops being an edit to part of a page and becomes something that
+#: happened to all of it.
+#:
+#: Both conditions together, because either alone misfires. A single repainted
+#: headline amount on a small advice covers 10% of it, which is why coverage
+#: alone cannot be the test; an honest page occasionally produces two specks,
+#: which is why a count alone cannot be either.
+#:
+#: Measured through the same path a caller uses. Honest journeys cover at most
+#: 1% in at most 2 regions. Local edits reach 14.2% — a doubled headline amount
+#: repaints both the hero and the table row of a small advice — but never in
+#: more than 2 regions. A page an online "image text editor" has re-typeset
+#: covers 38% to 67% in 6 to 10 regions.
+#:
+#: The coverage bar sits at 20% rather than just above 14.2% because the two
+#: populations are far apart there and the cost of being wrong is asymmetric:
+#: calling a real edit page-wide would soften language that should stay sharp.
+PAGE_WIDE_COVERAGE = 0.20
+PAGE_WIDE_REGIONS = 3
+
 
 @dataclass(frozen=True)
 class CarrierFinding:
@@ -553,6 +590,8 @@ class CarrierFinding:
     #: are in these coordinates, so a caller drawing them needs this to convert.
     read_width: int = 0
     read_height: int = 0
+    #: Share of the page lying inside a reported region.
+    coverage: float = 0.0
 
     @property
     def region(self) -> Region | None:
@@ -561,6 +600,27 @@ class CarrierFinding:
     @property
     def edited(self) -> bool:
         return self.measurable and self.blob >= EDIT_BLOB_THRESHOLD
+
+    @property
+    def page_wide(self) -> bool:
+        """Was this done to the whole page rather than to part of it?
+
+        Worth telling apart because the two mean different things to whoever is
+        holding the page, and because only one of them can be pointed at. An
+        edit is somewhere; this is everywhere, and thirty boxes covering half a
+        page tell a reader nothing they can act on.
+
+        The usual cause is not a forger at all. An online image-text editor
+        runs OCR over the page, erases the text it found and redraws it, then
+        exports. Every redrawn line is new pixels, so the proof is broken along
+        all of them — and there is no way to tell, from the carrier alone, that
+        the editor redrew a line unchanged while a forger changed one. Both are
+        the same act on the same pixels. What can be said is that the page is
+        no longer the one that was signed, which is the answer either way.
+        """
+        return (self.edited
+                and len(self.regions) >= PAGE_WIDE_REGIONS
+                and self.coverage >= PAGE_WIDE_COVERAGE)
 
 
 def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFinding:
@@ -608,13 +668,17 @@ def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFindin
     blob = int(stats[1:, cv2.CC_STAT_AREA].max()) if count > 1 else 0
 
     height, width = read_image.shape[:2]
+    regions = tuple(locate_all(read_image, bits))
+    page_area = float(width * height)
+    covered = sum((r.right - r.left) * (r.bottom - r.top) for r in regions)
     return CarrierFinding(
         measurable=True,
         blob=blob,
         background_rate=background,
-        regions=tuple(locate_all(read_image, bits)),
+        regions=regions,
         read_width=int(width),
         read_height=int(height),
+        coverage=(covered / page_area) if page_area else 0.0,
     )
 
 

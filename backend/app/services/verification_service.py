@@ -99,6 +99,8 @@ class VerificationService:
             }
             payload["read_width"] = finding.read_width
             payload["read_height"] = finding.read_height
+            payload["page_wide"] = finding.page_wide
+            payload["coverage"] = round(finding.coverage, 4)
             payload["regions"] = [
                 {"left": r.left, "top": r.top, "right": r.right,
                  "bottom": r.bottom, "blocks": r.blocks}
@@ -144,14 +146,26 @@ class VerificationService:
                 if carrier and carrier.get("edited"):
                     count = len(carrier.get("regions") or ())
                     where = "in one region" if count <= 1 else f"in {count} separate regions"
-                    return {
-                        "success": False,
-                        "result": "TAMPERED",
-                        "reason": (
+                    if carrier.get("page_wide"):
+                        share = round(float(carrier.get("coverage") or 0) * 100)
+                        note = (
+                            "The signature is genuine, but the proof is broken across "
+                            f"{share}% of the page rather than in one place. An online "
+                            "image editor does that: it redraws every line of text it "
+                            "finds, so all of them become new pixels. Whatever else was "
+                            "changed cannot be told apart from the editor's own work — "
+                            "ask for the original file."
+                        )
+                    else:
+                        note = (
                             "The signature is genuine, but the proof woven through "
                             f"the page is broken {where} — those parts were edited "
                             "after signing."
-                        ),
+                        )
+                    return {
+                        "success": False,
+                        "result": "TAMPERED",
+                        "reason": note,
                         "authority_name": key.get("authority_name"),
                         "authority_id": key.get("authority_id"),
                         "key_id": key_id,
@@ -200,7 +214,15 @@ class VerificationService:
                 if carrier:
                     details["carrier"] = carrier
                     count = len(carrier.get("regions") or ())
-                    if count:
+                    if carrier.get("page_wide"):
+                        share = round(float(carrier.get("coverage") or 0) * 100)
+                        reason = (
+                            "The document was signed, but the proof is broken across "
+                            f"{share}% of the page rather than in one place — the mark of "
+                            "an online image editor, which redraws every line of text it "
+                            "finds. Ask for the original file."
+                        )
+                    elif count:
                         where = "in one region" if count == 1 else f"in {count} separate regions"
                         reason = (
                             "The document was signed, but the page no longer matches "

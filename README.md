@@ -140,8 +140,28 @@ edits and costs one false accusation, and was not taken.
 
 What still gets through is small and specific: a single digit replaced by a same-width
 glyph, and two-character edits on the largest pages. Redrawn text restores the contrast the
-margin is read from, so those blocks go back to a coin toss. Every edit of a whole printed
-value — an amount, a name, a date, a reference number — is caught on every page size tested.
+margin is read from, so those blocks go back to a coin toss.
+
+**These numbers have real spread in them, and it is worth stating plainly.** RSA-PSS salts
+every signature, so signing the same page twice puts a different set of blocks in charge of
+carrying the proof. Signing one letter eight times and making the *same* single-date edit
+each time gives largest patches of 6, 8, 8, 10, 10, 14, 16, 17 — against 0 to 6 for
+untouched and sharpened copies of those same eight. Above the threshold five times out of
+eight. The edit is real every time; whether it is *visible* depends on which blocks happened
+to carry a bit next to it.
+
+So: an edit to a whole printed value on a page the size of a payout advice is caught
+reliably. A single small field on a large scan is not yet reliable, and the honest fix is
+not a lower threshold but more carrier — the payload is repeated at most 11 times whatever
+the page size, which leaves 69% of a 2000×2600 scan carrying nothing at all.
+
+**Page-wide damage is named rather than drawn.** An online image-text editor runs OCR over
+a page, erases the text it finds and redraws it. Measured, that covers 38–67% of the page in
+6–10 regions, where honest journeys cover at most 1% in at most 2 and even the largest
+single edit covers 14% in 2. Above 20% in 3 or more regions the verdict says the page has
+been through an editor and asks for the original file, instead of painting it orange —
+because at the pixel level an editor redrawing a line unchanged and a forger changing one
+are the same act, and nothing in the signature can separate them.
 
 **Region localisation** — 1 edit gives 1 box, 2 give 2, 3 give 3, each on the field that
 was actually repainted.

@@ -57,6 +57,11 @@ export type VerifyResult = {
       /** Size the carrier was read at — boxes are in these coordinates. */
       read_width?: number;
       read_height?: number;
+      /** True when the proof is broken across the page rather than in one
+       *  place — the mark of an editor that re-typeset it, not of one edit. */
+      page_wide?: boolean;
+      /** Share of the page lying inside a reported region. */
+      coverage?: number;
       regions?: Array<{
         left: number;
         top: number;
