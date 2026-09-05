@@ -48,6 +48,27 @@ export type VerifyResult = {
      * made either way. `blob` is the largest torn patch of carrier; at or
      * above `threshold` the page was edited after signing.
      */
+    /** What the copy filed at signing time says about this page. Present
+     *  only when that copy could be found — by the signature in the pixels,
+     *  or, where an editor has destroyed it, by what the page looks like.
+     *  This is a claim about the document's content, not about its pixels,
+     *  and it outranks `carrier` wherever both have an opinion. */
+    content?: {
+      compared: boolean;
+      differs: boolean;
+      identified_by?: "signature" | "appearance";
+      coverage: number;
+      image_width: number;
+      image_height: number;
+      document_id?: string;
+      regions?: Array<{
+        left: number;
+        top: number;
+        right: number;
+        bottom: number;
+        blocks: number;
+      }>;
+    };
     carrier?: {
       measurable: boolean;
       edited: boolean;

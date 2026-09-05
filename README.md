@@ -167,6 +167,44 @@ Genuine passed          36 / 40      FPR        0.000
 **Payslips** — the same detector, unchanged: genuine slips pass, and erasing one digit of
 net pay is caught and boxed.
 
+## Checking against the copy that was filed
+
+The carrier answers from the file alone, which is the right default: no lookup, no
+account, and a document issued a year ago answers as well as one issued a minute ago.
+There is one page it cannot answer for.
+
+An online image-text editor runs OCR over a page, erases every line of text it finds and
+redraws it. Every line is then new pixels, so the carrier is broken along all of them —
+and nothing in the signature distinguishes a line the editor redrew *unchanged* from a
+line a forger *changed*. Both are the same act on the same pixels.
+
+Content can tell them apart, but only against something. That something is the copy the
+object store already keeps from signing time. Each 16×16 block of the page is matched
+against a small neighbourhood of that copy and scored on the best match found, so a line
+redrawn a pixel to the left matches itself a pixel to the left, and a changed digit
+matches nothing.
+
+Finding the filed copy takes two routes. The signature carried in the pixels names it
+exactly. Where an editor has destroyed the signature, the 128-bit perceptual fingerprint
+still identifies it: measured, the same document lands 2–7 bits away after WhatsApp, JPEG
+quality 20, a photograph of a screen, a watermark, or a full re-typeset, while unrelated
+documents land at 65–67. That identifies the page; it never authenticates it, and where
+the signature is gone the verdict says so.
+
+| Case | Result |
+|---|---|
+| Untouched, and 19 honest journeys (JPEG down to q20, WhatsApp, screenshot, photo of a screen, greyscale, ±8% brightness) | no boxes |
+| Editor's watermark tiled over the page | no boxes |
+| Whole page re-typeset by an editor, nothing changed | no boxes, and the verdict says the file was re-saved but every word matches |
+| One date changed | **one red box, on the date** |
+| One date changed, under the watermark | **one red box, on the date** |
+| One date changed, on a fully re-typeset page | **one red box, on the date** |
+
+0 false alarms in 19 honest journeys, and the changed field boxed in every case that had
+one. A red box is a claim about the document — *this is not what it said* — so it does not
+share a colour with the amber carrier box, which is the softer claim that some pixel was
+repainted.
+
 ## What it cannot do
 
 Stated because a detector's limits matter as much as its numbers.

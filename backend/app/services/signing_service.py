@@ -127,6 +127,15 @@ class SigningService:
                 "signed_by_uid": (signed_by or {}).get("uid"),
                 "signed_by_email": (signed_by or {}).get("email"),
                 "signing_mode": "invisible_watermark",
+                # The signature woven into the pixels, which is what lets a
+                # later verification find this record from the document alone.
+                # Without it the filed copy cannot be located, and localisation
+                # falls back to the carrier — which cannot tell an editor's
+                # redraw from a forger's.
+                "watermark_signature": (
+                    sign_result["signature"]
+                    if isinstance(sign_result.get("signature"), str) else None
+                ),
                 "notes": "Signed by Digital Trust Shield FastAPI backend.",
             }
             try:

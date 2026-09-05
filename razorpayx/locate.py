@@ -516,7 +516,21 @@ def locate(image: np.ndarray, payload_bits: np.ndarray, *, window: int = WINDOW)
     return found[0] if found else None
 
 
-def payload_bits_for(image: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
+@dataclass(frozen=True)
+class Recovered:
+    """A payload read back off a page, and what it took to read it."""
+
+    #: The payload as bits, in the order the embedder wrote them.
+    bits: np.ndarray
+    #: The image the payload actually came off, which is not the uploaded one
+    #: when recovery succeeded at another scale.
+    image: np.ndarray
+    #: The RSA signature carried in that payload, base64. This is what names
+    #: the document: the copy filed when it was signed can be found by it.
+    signature: str
+
+
+def payload_bits_for(image: np.ndarray) -> Recovered | None:
     """Recover the payload, and return the image it was recovered from.
 
     Both, and that is the point. The extractor retries at several scales — a
@@ -527,7 +541,9 @@ def payload_bits_for(image: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
     Returning only the bits, as this did, silently paired them with the
     original: the disagreement map then compared a payload recovered at 0.5x
     against blocks measured at 1.0x, so every block disagreed and the result
-    was noise dressed up as a finding. The scale has to travel with the bits.
+    was noise dressed up as a finding. The scale has to travel with the bits,
+    and so does the signature — it is the name under which the copy filed at
+    signing time can be found again.
 
     None means the payload could not be recovered at any scale — no carrier
     left to reason about, which is a refusal rather than a guess.
@@ -551,7 +567,8 @@ def payload_bits_for(image: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
         except Exception:
             continue
         payload = u.build_watermark_payload(u.signature_from_base64(signature_b64), fingerprint)
-        return u.bytes_to_bits(payload), candidate
+        return Recovered(bits=u.bytes_to_bits(payload), image=candidate,
+                         signature=signature_b64)
     return None
 
 
@@ -629,6 +646,8 @@ class CarrierFinding:
     read_height: int = 0
     #: Share of the page lying inside a reported region.
     coverage: float = 0.0
+    #: The signature recovered from the page, base64, or "" when none was.
+    signature: str = ""
 
     @property
     def region(self) -> Region | None:
@@ -708,7 +727,7 @@ def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFindin
     recovered = payload_bits_for(image)
     if recovered is None:
         return CarrierFinding(measurable=False, blob=0, background_rate=0.0)
-    bits, read_image = recovered
+    bits, read_image = recovered.bits, recovered.image
 
     weak, written, page_margin = carrier_weakness(read_image, bits)
     if weak.size == 0 or page_margin < MIN_PAGE_MARGIN:
@@ -735,6 +754,7 @@ def inspect_carrier(image: np.ndarray, *, window: int = WINDOW) -> CarrierFindin
         read_width=int(width),
         read_height=int(height),
         coverage=_coverage(regions, width, height),
+        signature=recovered.signature,
     )
 
 
@@ -744,5 +764,4 @@ def locate_in_file(path: str | Path, *, window: int = WINDOW) -> Region | None:
     recovered = payload_bits_for(image)
     if recovered is None:
         return None
-    bits, read_image = recovered
-    return locate(read_image, bits, window=window)
+    return locate(recovered.image, recovered.bits, window=window)

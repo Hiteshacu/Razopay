@@ -53,6 +53,12 @@ def verify_file_adapter(input_path: str | Path, public_key_path: str | Path) -> 
     return {
         "valid": bool(is_valid),
         "asset_type": "image",
+        # The whole signature, alongside the preview shown to a reader. It is
+        # how the copy filed at signing time is found again, and it is not a
+        # secret — it is carried in the pixels of every copy of the document.
+        # Kept out of `details` so it does not travel to the browser for no
+        # reason.
+        "signature": signature_b64,
         "details": {"signature_preview": signature_b64[:32] + "..."},
     }
 

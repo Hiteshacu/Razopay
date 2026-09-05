@@ -101,6 +101,10 @@ class VerificationService:
             payload["read_height"] = finding.read_height
             payload["page_wide"] = finding.page_wide
             payload["coverage"] = round(finding.coverage, 4)
+            # Carried so the branch that reaches this through an exception can
+            # still find the copy filed at signing time. It is not sent on to
+            # the browser; the caller strips it.
+            payload["signature"] = finding.signature
             payload["regions"] = [
                 {"left": r.left, "top": r.top, "right": r.right,
                  "bottom": r.bottom, "blocks": r.blocks}
@@ -113,6 +117,106 @@ class VerificationService:
             # with nothing wrong, and the only difference visible from outside
             # is that no region is ever drawn.
             print(f"WARNING: carrier inspection failed for {upload_path.name}: {exc}", flush=True)
+            return None
+
+    @staticmethod
+    def _page_fingerprint(upload_path: Path) -> str:
+        """The 128-bit perceptual fingerprint of a page, as hex.
+
+        The same function the signing flow stored, so the two are comparable.
+        """
+        try:
+            import sys as _sys
+
+            root = str(Path(__file__).resolve().parents[3])
+            if root not in _sys.path:
+                _sys.path.insert(0, root)
+            from ..core.trust_shield_adapter import visual_fingerprint_hex
+
+            return visual_fingerprint_hex(upload_path)
+        except Exception:
+            return ""
+
+    def _compare_to_filed_copy(self, upload_path: Path, signature_b64: str | None) -> dict | None:
+        """What the copy filed at signing time says about the page in hand.
+
+        This is the answer the carrier cannot give. A page that has been
+        through an online image editor has had every line of text erased and
+        redrawn, so the carrier is broken along all of them and cannot say
+        which line a forger also changed — both are new pixels. Content can
+        say, but only against something, and the something is the copy the
+        object store kept when the document was signed.
+
+        Returns None whenever there is nothing to compare against, which is
+        not a failure: a document signed before the signature was recorded, a
+        record whose file has been deleted, or an image carrying no signature
+        at all. The carrier still answers in every one of those cases.
+
+        Never allowed to fail a verification.
+        """
+        try:
+            import sys as _sys
+
+            root = str(Path(__file__).resolve().parents[3])
+            if root not in _sys.path:
+                _sys.path.insert(0, root)
+
+            record = self.firebase.find_signed_document_by_signature(signature_b64)
+            if not record:
+                # No signature, or none that names a filed record. That is the
+                # ordinary state of a page an image editor has been through, and
+                # it is exactly the page most in need of this comparison — so
+                # fall back to finding the document by what it looks like. This
+                # only identifies which document is being looked at; whether
+                # this copy is genuine is still the signature's question, and
+                # the caller says so where the signature is gone.
+                fingerprint = self._page_fingerprint(upload_path)
+                record = self.firebase.find_signed_document_by_fingerprint(fingerprint)
+            if not record:
+                return None
+            storage_path = record.get("signed_file_storage_path")
+            if not storage_path:
+                return None
+
+            from .document_store import get_document_store
+
+            chunks = get_document_store().stream(str(storage_path))
+            first = next(chunks, b"")
+            if not first:
+                return None
+            filed = first + b"".join(chunks)
+
+            import cv2
+            import numpy as np
+
+            from razorpayx.compare import compare
+            from utils import read_image
+
+            reference = cv2.imdecode(np.frombuffer(filed, dtype=np.uint8), cv2.IMREAD_COLOR)
+            if reference is None:
+                return None
+
+            finding = compare(read_image(upload_path), reference)
+            if not finding.comparable:
+                return None
+            return {
+                "compared": True,
+                "identified_by": "signature" if signature_b64 and record.get(
+                    "fingerprint_distance") is None else "appearance",
+                "differs": finding.differs,
+                "coverage": round(finding.coverage, 4),
+                "image_width": finding.width,
+                "image_height": finding.height,
+                "document_id": record.get("document_id"),
+                "regions": [
+                    {"left": r.left, "top": r.top, "right": r.right,
+                     "bottom": r.bottom, "blocks": r.blocks}
+                    for r in finding.regions
+                ],
+            }
+        except Exception as exc:  # pragma: no cover - never blocks a verdict
+            print(f"WARNING: comparison against the filed copy failed for "
+                  f"{upload_path.name}: {exc}", flush=True)
             return None
 
     def _verify_with_public_key(
@@ -128,10 +232,17 @@ class VerificationService:
         try:
             result = verify_file_adapter(upload_path, public_key_path)
             carrier = self._inspect_carrier(upload_path)
+            content = self._compare_to_filed_copy(upload_path, result.get("signature"))
+            # Used, not shown: 344 characters of base64 in every response, to
+            # tell a reader something the image already carries.
+            if carrier:
+                carrier.pop("signature", None)
             if result["valid"]:
                 details = dict(result.get("details", {}))
                 if carrier:
                     details["carrier"] = carrier
+                if content:
+                    details["content"] = content
                 if selected_key_id and selected_key_id != key_id:
                     details = {
                         **details,
@@ -143,6 +254,46 @@ class VerificationService:
                 # but the carrier is flattened somewhere. That is an edit small
                 # enough for the fingerprint's tolerance to absorb, which is
                 # exactly the case it was blind to, so the carrier overrules.
+                # The filed copy has the last word when there is one. It
+                # answers the question the reader is actually asking — has
+                # anything this page says changed — where the carrier answers
+                # a narrower one, whether any pixel was repainted. On a page an
+                # editor re-typeset those give opposite answers, and the filed
+                # copy is the one that is right.
+                if content and content.get("compared"):
+                    if content.get("differs"):
+                        count = len(content.get("regions") or ())
+                        where = "in one place" if count == 1 else f"in {count} places"
+                        return {
+                            "success": False,
+                            "result": "TAMPERED",
+                            "reason": (
+                                "This page does not say what it said when it was "
+                                f"signed. Compared against the copy filed then, it "
+                                f"differs {where}, marked on the image."
+                            ),
+                            "authority_name": key.get("authority_name"),
+                            "authority_id": key.get("authority_id"),
+                            "key_id": key_id,
+                            "details": details,
+                        }
+                    if carrier and carrier.get("edited"):
+                        return {
+                            "success": True,
+                            "result": "AUTHENTIC",
+                            "reason": (
+                                "Every word and figure on this page matches the copy "
+                                "filed when it was signed. The file itself has been "
+                                "re-saved since — an image editor redraws the text it "
+                                "finds — so it is not the original file, but nothing "
+                                "it says has been changed."
+                            ),
+                            "authority_name": key.get("authority_name"),
+                            "authority_id": key.get("authority_id"),
+                            "key_id": key_id,
+                            "details": details,
+                        }
+
                 if carrier and carrier.get("edited"):
                     count = len(carrier.get("regions") or ())
                     where = "in one region" if count <= 1 else f"in {count} separate regions"
@@ -209,10 +360,77 @@ class VerificationService:
             # there is a carrier to reason about. WATERMARK_NOT_FOUND means
             # there is not, and asking costs a full read at a dozen scales to
             # be told what is already known.
+            # A page an image editor has re-typeset carries no readable
+            # signature at all, so it lands here as WATERMARK_NOT_FOUND — a
+            # verdict that tells the holder of a genuine document it was never
+            # issued. The filed copy can still be found by what the page looks
+            # like, and it is the only thing that can say whether any of what
+            # the page says has changed.
+            if result_code == "WATERMARK_NOT_FOUND":
+                content = self._compare_to_filed_copy(upload_path, None)
+                if content and content.get("compared"):
+                    details["content"] = content
+                    document = content.get("document_id")
+                    if content.get("differs"):
+                        count = len(content.get("regions") or ())
+                        where = "in one place" if count == 1 else f"in {count} places"
+                        return {
+                            "success": False,
+                            "result": "TAMPERED",
+                            "reason": (
+                                "No signature survives in this file — it has been "
+                                "re-saved, which destroys the proof woven through the "
+                                f"pixels. It is recognisably document {document}, and "
+                                f"against the copy filed then it differs {where}, "
+                                "marked on the image."
+                            ),
+                            "authority_name": key.get("authority_name"),
+                            "authority_id": key.get("authority_id"),
+                            "key_id": key_id,
+                            "details": details,
+                        }
+                    return {
+                        "success": False,
+                        "result": "WATERMARK_NOT_FOUND",
+                        "reason": (
+                            "No signature survives in this file — it has been re-saved, "
+                            "which destroys the proof woven through the pixels, so this "
+                            f"copy cannot be proved genuine. It is recognisably document "
+                            f"{document}, and every word and figure on it matches the "
+                            "copy filed when that was signed. Ask for the original file "
+                            "before relying on it."
+                        ),
+                        "authority_name": key.get("authority_name"),
+                        "authority_id": key.get("authority_id"),
+                        "key_id": key_id,
+                        "details": details,
+                    }
+
             if result_code == "TAMPERED":
                 carrier = self._inspect_carrier(upload_path)
                 if carrier:
                     details["carrier"] = carrier
+                    content = self._compare_to_filed_copy(
+                        upload_path, carrier.pop("signature", None))
+                    if content:
+                        details["content"] = content
+                        if content.get("differs"):
+                            count = len(content.get("regions") or ())
+                            where = "in one place" if count == 1 else f"in {count} places"
+                            details["carrier"] = carrier
+                            return {
+                                "success": False,
+                                "result": "TAMPERED",
+                                "reason": (
+                                    "This page does not say what it said when it was "
+                                    f"signed. Compared against the copy filed then, it "
+                                    f"differs {where}, marked on the image."
+                                ),
+                                "authority_name": key.get("authority_name"),
+                                "authority_id": key.get("authority_id"),
+                                "key_id": key_id,
+                                "details": details,
+                            }
                     count = len(carrier.get("regions") or ())
                     if carrier.get("page_wide"):
                         share = round(float(carrier.get("coverage") or 0) * 100)

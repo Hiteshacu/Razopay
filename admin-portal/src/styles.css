@@ -856,6 +856,16 @@ button.download-button:disabled { opacity: 0.65; cursor: progress; }
   pointer-events: none;
 }
 
+/* Red, and only for a difference against the copy filed at signing time.
+   The amber box above says "the proof is torn here", which is a statement
+   about pixels. This one says "this is not what the document said", which is
+   a statement about the document — a different claim, and the one a reader
+   acts on, so it does not share a colour with the softer one. */
+.damage-box.content {
+  border-color: #b91c1c;
+  box-shadow: 0 0 0 9999px rgba(43, 2, 2, 0.42);
+}
+
 .damage-figure figcaption {
   font-size: var(--t-sm);
   color: var(--ink-3);

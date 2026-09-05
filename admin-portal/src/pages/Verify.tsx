@@ -194,6 +194,53 @@ export function Verify({ onBack }: { onBack: () => void }) {
   }
 
   const verdict = result ? VERDICTS[result.result] ?? VERDICTS.ERROR : null;
+
+  /**
+   * Which boxes to draw, and in which colour.
+   *
+   * The copy filed at signing time wins wherever it has an opinion. It answers
+   * what the reader is asking — has anything this document says changed — and
+   * it is right on the page the carrier cannot read: one an online image editor
+   * has re-typeset, where every line is new pixels and only the content can say
+   * which line also changed meaning.
+   *
+   * The carrier is what is left when no filed copy could be found, and it is
+   * still the answer for most documents, which is why it is not simply
+   * replaced.
+   */
+  const marks = (() => {
+    const content = result?.details?.content;
+    if (content?.regions?.length) {
+      return {
+        boxes: content.regions,
+        width: content.image_width || naturalSize.w,
+        height: content.image_height || naturalSize.h,
+        fromContent: true,
+        caption:
+          "Marked against the copy filed when this document was signed — this is " +
+          "where what the page says has changed. Everything else on it, including " +
+          "anything an editor re-drew, still matches."
+      };
+    }
+    const carrier = result?.details?.carrier;
+    if (carrier?.regions?.length) {
+      return {
+        boxes: carrier.regions,
+        width: carrier.read_width || naturalSize.w,
+        height: carrier.read_height || naturalSize.h,
+        fromContent: false,
+        caption: carrier.page_wide
+          ? "Every place the page differs from what was signed. Spread this widely, " +
+            "it is the mark of an online image editor redrawing the text it found — " +
+            "so the editor's own work and anything else that changed cannot be told " +
+            "apart. Ask for the original file."
+          : "The proof woven through the page is torn here — read out of the pixels " +
+            "themselves, not from any record of what this page said."
+      };
+    }
+    return { boxes: [] as Array<{ left: number; top: number; right: number; bottom: number }>,
+             width: 1, height: 1, fromContent: false, caption: "" };
+  })();
   const VerdictIcon = verdict?.icon ?? HelpCircle;
   const autoDetected = Boolean(result?.details?.auto_detected_key);
 
@@ -491,45 +538,31 @@ export function Verify({ onBack }: { onBack: () => void }) {
                   something more specific to say — how many places on the
                   page changed, which the boxes below are about to show. */}
               <p className="verdict-plain">
-                {(result.details?.carrier?.regions?.length ?? 0) > 0 && result.reason
-                  ? result.reason
-                  : verdict.plain}
+                {marks.boxes.length > 0 && result.reason ? result.reason : verdict.plain}
               </p>
 
               {/* Every changed part, drawn on the page the reader uploaded.
                   Percentages rather than pixels: the carrier may have been
                   read at a different scale than the file was uploaded at, and
                   the preview is scaled again to fit. */}
-              {preview && (result.details?.carrier?.regions?.length ?? 0) > 0 && (
+              {preview && (marks.boxes.length > 0) && (
                 <figure className="damage-figure">
                   <div className="damage-frame">
                     <img src={preview} alt="" />
-                    {result.details!.carrier!.regions!.map((box, index) => {
-                      const w = result.details!.carrier!.read_width || naturalSize.w;
-                      const h = result.details!.carrier!.read_height || naturalSize.h;
-                      return (
-                        <span
-                          key={`${box.left}-${box.top}-${index}`}
-                          className="damage-box"
-                          style={{
-                            left: `${(box.left / w) * 100}%`,
-                            top: `${(box.top / h) * 100}%`,
-                            width: `${((box.right - box.left) / w) * 100}%`,
-                            height: `${((box.bottom - box.top) / h) * 100}%`
-                          }}
-                        />
-                      );
-                    })}
+                    {marks.boxes.map((box, index) => (
+                      <span
+                        key={`${box.left}-${box.top}-${index}`}
+                        className={marks.fromContent ? "damage-box content" : "damage-box"}
+                        style={{
+                          left: `${(box.left / marks.width) * 100}%`,
+                          top: `${(box.top / marks.height) * 100}%`,
+                          width: `${((box.right - box.left) / marks.width) * 100}%`,
+                          height: `${((box.bottom - box.top) / marks.height) * 100}%`
+                        }}
+                      />
+                    ))}
                   </div>
-                  <figcaption>
-                    {result.details?.carrier?.page_wide
-                      ? "Every place the page differs from what was signed. Spread this " +
-                        "widely, it is the mark of an online image editor redrawing the " +
-                        "text it found — so the editor's own work and anything else that " +
-                        "changed cannot be told apart. Ask for the original file."
-                      : "The proof woven through the page is torn here — read out of the " +
-                        "pixels themselves, not from any record of what this page said."}
-                  </figcaption>
+                  <figcaption>{marks.caption}</figcaption>
                 </figure>
               )}
 

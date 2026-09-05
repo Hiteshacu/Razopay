@@ -118,10 +118,16 @@ def _locate_damage(image: np.ndarray):
     try:
         from .locate import locate, payload_bits_for
 
-        bits = payload_bits_for(image)
-        if bits is None:
+        recovered = payload_bits_for(image)
+        if recovered is None:
             return None
-        return locate(image, bits)
+        # Both halves of what came back. This passed the whole result where
+        # the bits belonged, and located against the uploaded image rather
+        # than the one the payload was actually read off — so it raised, the
+        # except below swallowed it, and the field check silently never drew a
+        # highlight. A failure that only ever removes a highlight is exactly
+        # the kind that survives a long time.
+        return locate(recovered.image, recovered.bits)
     except Exception:
         return None
 
